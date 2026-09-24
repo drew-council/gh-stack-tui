@@ -279,8 +279,8 @@ func (m *Model) reviewSelection() []int {
 		}
 	}
 	if len(sel) == 0 {
-		if r, ok := m.hovered(); ok && r.branch >= 0 {
-			sel = []int{r.branch}
+		if bi := m.hoveredBranch(); bi >= 0 {
+			sel = []int{bi}
 		}
 	}
 	return sel
@@ -294,15 +294,15 @@ func (m *Model) isSelected(i int, name string) bool {
 	if !m.visual {
 		return false
 	}
-	r, ok := m.hovered()
-	if !ok || r.branch < 0 {
+	bi := m.hoveredBranch()
+	if bi < 0 {
 		return false
 	}
 	a := m.snap.IndexOf(m.anchor)
 	if a < 0 {
 		return false
 	}
-	lo, hi := min(a, r.branch), max(a, r.branch)
+	lo, hi := min(a, bi), max(a, bi)
 	return i >= lo && i <= hi
 }
 

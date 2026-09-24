@@ -122,8 +122,8 @@ func (m Model) applyLocal(msg localLoadedMsg) (tea.Model, tea.Cmd) {
 	}
 
 	fallback := ""
-	if r, ok := m.hovered(); ok && r.branch >= 0 && m.snap != nil {
-		fallback = m.snap.Branches[r.branch].Name
+	if bi := m.hoveredBranch(); bi >= 0 && m.snap != nil {
+		fallback = m.snap.Branches[bi].Name
 	}
 	// When the checked out branch changes (a checkout, add, or navigation in
 	// another terminal) and the cursor was on the old one, follow it.
@@ -255,8 +255,8 @@ func (m Model) applyRemote(msg remoteLoadedMsg) (tea.Model, tea.Cmd) {
 	m.prs = msg.prs
 	m.lastRemote = time.Now()
 	fallback := ""
-	if r, ok := m.hovered(); ok && r.branch >= 0 {
-		fallback = m.snap.Branches[r.branch].Name
+	if bi := m.hoveredBranch(); bi >= 0 {
+		fallback = m.snap.Branches[bi].Name
 	}
 	m.buildRows()
 	m.restoreCursor(fallback)

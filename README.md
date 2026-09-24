@@ -8,6 +8,7 @@ It covers what `gh stack view` shows, and adds:
 - **CI checks per PR**, grouped by workflow. Each workflow expands to its jobs, and re-runs are deduplicated.
 - **Stack operations without leaving the TUI:** push, sync, rebase, submit, merge, add, and unstack. Output streams into a panel under the stack. `gh stack modify` runs in the foreground and the TUI comes back when it exits.
 - **Vim-style keys throughout.** Arrow keys also work.
+- **Catppuccin Mocha** colors, laid out like `gh stack view`.
 - **Copying** the hovered file path, commit SHA, branch name, or URL.
 - **Review:** select layers of the stack and open their combined commit range in [tuicr](https://github.com/agavra/tuicr), in a new herdr tab, a new tmux window, or inline.
 
@@ -23,21 +24,24 @@ Stack operations run `gh stack` against the checked out stack. When you are view
 
 ## Keys
 
+`j`/`k` move between the branches of the stack, exactly like `gh stack view`. Files, commits, and CI checks open under a branch with `f`, `C`, and `x` (or `l` to open everything). To act on one of them, press `l` again to go into the branch: `j`/`k` then step through its items, and `h` goes back to the branch. Merged branches are shown but skipped.
+
 Stack operations follow the aliases of the `gs` wrapper: `p` push, `s` sync, `P` sync --prune, `r` rebase, `c` checkout, `a` add, `m` modify, and `u` unstack. `R` takes the place of `gs review`.
 
-| Navigate | | Hovered item | |
+| Navigate | | Hovered branch or item | |
 |---|---|---|---|
-| `j`/`k` `↓`/`↑` | move | `o` | open in browser (PR, file, commit, workflow run, check) |
-| `J`/`K` | next/prev branch | `y` | copy branch / path / SHA / URL |
-| `gg`/`G` | top/bottom | `Y` | copy every file path in the branch |
+| `j`/`k` `↓`/`↑` | prev/next branch, or item once inside | `o` | open in browser (PR, file, commit, workflow run, check) |
+| `J`/`K` | prev/next branch, from anywhere | `y` | copy branch / path / SHA / URL |
+| `gg`/`G` | top/bottom branch | `Y` | copy every file path in the branch |
 | `ctrl+d`/`ctrl+u` | half page | `e` | open file in `$EDITOR` |
 | `.` | current branch | `c` | checkout branch |
 | `[` `]` | prev/next stack | `M` | merge PR and the PRs below it (asks first) |
+| mouse | wheel scrolls, click selects or toggles | | |
 
 | Expand | | Stack | |
 |---|---|---|---|
-| `l` `→` `enter` | expand / toggle | `p` / `s` / `P` | push / sync / sync --prune |
-| `h` `←` | collapse / go to parent | `S` | submit --auto |
+| `l` `→` `enter` | open the branch, then go into its items | `p` / `s` / `P` | push / sync / sync --prune |
+| `h` `←` | back to the branch, then close it | `S` | submit --auto |
 | `f` / `C` / `x` | files / commits / CI checks | `rr` `ru` `rd` | rebase stack / upstack / downstack |
 | `z` / `Z` | toggle branch / collapse all | `rc` `ra` | rebase continue / abort |
 | | | `a` | add a branch (prompts for a name) |

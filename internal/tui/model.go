@@ -58,6 +58,8 @@ type Model struct {
 	fingerprint   string
 	ghRepo        github.Repo
 
+	st styles
+
 	rows      []row
 	cursor    int
 	cursorKey string
@@ -93,9 +95,11 @@ func New(repo *git.Repo, opts Options) Model {
 	in := textinput.New()
 	in.Prompt = ""
 	in.CharLimit = 256
+	st := newStyles()
 	return Model{
 		opts: opts,
 		repo: repo,
+		st:   st,
 		// Init starts the first local load.
 		loadingLocal: true,
 		prs:          map[string]*github.PR{},
@@ -104,7 +108,7 @@ func New(repo *git.Repo, opts Options) Model {
 		input:        in,
 		spinner: spinner.New(
 			spinner.WithSpinner(spinner.MiniDot),
-			spinner.WithStyle(dimStyle),
+			spinner.WithStyle(st.dim),
 		),
 	}
 }
@@ -132,11 +136,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseWheelMsg:
 		switch msg.Mouse().Button {
 		case tea.MouseWheelUp:
-			m.moveCursor(-3)
+			m.scroll -= 3
 		case tea.MouseWheelDown:
-			m.moveCursor(3)
+			m.scroll += 3
 		}
-		m.ensureVisible()
+		m.clampScroll()
+		return m, nil
+
+	case tea.MouseClickMsg:
+		if mo := msg.Mouse(); mo.Button == tea.MouseLeft && m.mode == modeNormal {
+			return m, m.click(mo.X, mo.Y)
+		}
 		return m, nil
 
 	case spinner.TickMsg:
@@ -258,4 +268,41 @@ func (m *Model) merged(i int) bool {
 		return true
 	}
 	return m.snap.Branches[i].Merged
+}
+
+// click selects the branch or item under the mouse, toggles a section or a
+// workflow, and opens a PR when its number is clicked.
+func (m *Model) click(x, y int) tea.Cmd {
+	line := y - m.bodyTop() + m.scroll
+	if y < m.bodyTop() || line < 0 {
+		return nil
+	}
+	for i, r := range m.rows {
+		if line < r.y || line >= r.y+r.height {
+			continue
+		}
+		switch {
+		case r.kind == rowSection:
+			if m.navigable(m.branchRow(r.branch)) {
+				m.setCursor(m.branchRow(r.branch))
+			}
+			m.expanded[r.key] = !m.expanded[r.key]
+			m.rebuild()
+		case r.kind == rowWorkflow:
+			m.setCursor(i)
+			m.expanded[r.key] = !m.expanded[r.key]
+			m.rebuild()
+		case m.navigable(i):
+			m.setCursor(i)
+			// The PR number sits right after the bullet and status icon.
+			if r.kind == rowBranch && r.height == 2 && line == r.y && x >= 2 && x < 12 {
+				if url := m.prURL(r.branch); url != "" {
+					return openBrowser(url)
+				}
+			}
+		}
+		m.ensureVisible()
+		return nil
+	}
+	return nil
 }

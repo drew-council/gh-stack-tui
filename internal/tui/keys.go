@@ -33,16 +33,16 @@ type helpSection struct {
 // R taking the place of `gs review`.
 var helpSections = []helpSection{
 	{"navigate", [][2]string{
-		{"j/k ↓/↑", "move"},
-		{"J/K", "next/prev branch"},
+		{"j/k ↓/↑", "prev/next branch"},
+		{"J/K", "prev/next branch (from inside)"},
 		{"gg/G", "top/bottom"},
 		{"ctrl+d/u", "half page"},
 		{".", "current branch"},
 		{"[ ]", "prev/next stack"},
 	}},
 	{"expand", [][2]string{
-		{"l → enter", "expand / toggle"},
-		{"h ←", "collapse / parent"},
+		{"l → enter", "expand / go into"},
+		{"h ←", "collapse / go back"},
 		{"f", "files"},
 		{"C", "commits"},
 		{"x", "CI checks"},
@@ -136,17 +136,17 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "K", "shift+up":
 		m.jumpBranch(-1)
 	case "G", "end":
-		m.setCursor(len(m.rows) - 1)
+		m.lastBranch()
 	case "home":
-		m.setCursor(0)
+		m.firstBranch()
 	case "ctrl+d", "pgdown":
-		m.moveCursor(max(1, m.bodyHeight()/2))
+		m.pageBranch(max(1, m.bodyHeight()/2))
 	case "ctrl+u", "pgup":
-		m.moveCursor(-max(1, m.bodyHeight()/2))
+		m.pageBranch(-max(1, m.bodyHeight()/2))
 	case ".":
 		if m.snap != nil {
-			if i := m.snap.IndexOf(m.snap.CurrentBranch); i >= 0 {
-				m.setCursor(m.branchRow(i))
+			if i := m.branchRow(m.snap.IndexOf(m.snap.CurrentBranch)); i >= 0 {
+				m.setCursor(i)
 			}
 		}
 	case "[", "]":
@@ -232,7 +232,7 @@ func (m Model) handleChord(prefix, key string) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch prefix + key {
 	case "gg":
-		m.setCursor(0)
+		m.firstBranch()
 	case "rr":
 		cmd = m.stackOp("rebase", "rebase")
 	case "ru":
@@ -290,37 +290,32 @@ func (m *Model) cycleStack(key string) tea.Cmd {
 
 func (m *Model) rebuild() {
 	fallback := ""
-	if r, ok := m.hovered(); ok && r.branch >= 0 {
-		fallback = m.snap.Branches[r.branch].Name
+	if bi := m.hoveredBranch(); bi >= 0 {
+		fallback = m.snap.Branches[bi].Name
 	}
 	m.buildRows()
 	m.restoreCursor(fallback)
 }
 
-func (m *Model) expand(toggle bool) tea.Cmd {
+// expand is l and enter. On a branch it goes into the branch's items when
+// any section is open, and opens every section otherwise. On a workflow it
+// toggles the workflow's checks. Enter on any other item opens it.
+func (m *Model) expand(enter bool) tea.Cmd {
 	r, ok := m.hovered()
 	if !ok {
 		return nil
 	}
 	switch r.kind {
 	case rowBranch:
-		name := m.snap.Branches[r.branch].Name
-		if toggle && m.branchExpanded(name) {
-			m.setBranchExpanded(name, false)
-		} else {
-			m.setBranchExpanded(name, true)
-		}
-	case rowSection, rowWorkflow:
-		if toggle {
-			m.expanded[r.key] = !m.expanded[r.key]
-		} else if !m.expanded[r.key] {
-			m.expanded[r.key] = true
-		} else {
-			m.moveCursor(1)
+		if i := m.firstItem(r.branch); i >= 0 {
+			m.setCursor(i)
 			return nil
 		}
+		m.setBranchExpanded(m.snap.Branches[r.branch].Name, true)
+	case rowWorkflow:
+		m.expanded[r.key] = !m.expanded[r.key]
 	default:
-		if toggle {
+		if enter {
 			return m.openHovered()
 		}
 		return nil
@@ -329,53 +324,38 @@ func (m *Model) expand(toggle bool) tea.Cmd {
 	return nil
 }
 
+// collapse is h. On a branch it closes every section. On a check it closes
+// the workflow and parks on it; on any other item it goes back to the branch.
 func (m *Model) collapse() {
 	r, ok := m.hovered()
 	if !ok {
 		return
 	}
-	switch {
-	case (r.kind == rowSection || r.kind == rowWorkflow) && m.expanded[r.key]:
-		m.expanded[r.key] = false
-	case r.kind == rowBranch:
-		m.setBranchExpanded(m.snap.Branches[r.branch].Name, false)
-	default:
-		// Move to the parent row, closing it like a file tree does.
-		parent := m.parentKey(r)
-		if r.kind == rowFile || r.kind == rowCommit || r.kind == rowWorkflow || r.kind == rowCheck {
-			m.expanded[parent] = false
-		}
-		m.cursorKey = parent
-	}
-	m.rebuild()
-}
-
-func (m *Model) parentKey(r row) string {
-	name := m.snap.Branches[r.branch].Name
 	switch r.kind {
-	case rowFile:
-		return sectionKey(name, secFiles)
-	case rowCommit:
-		return sectionKey(name, secCommits)
-	case rowWorkflow:
-		return sectionKey(name, secChecks)
+	case rowBranch:
+		m.setBranchExpanded(m.snap.Branches[r.branch].Name, false)
+		m.rebuild()
 	case rowCheck:
-		return workflowKey(name, r.workflow.Name)
+		wk := workflowKey(m.snap.Branches[r.branch].Name, r.workflow.Name)
+		m.expanded[wk] = false
+		m.cursorKey = wk
+		m.rebuild()
 	default:
-		return "branch\x00" + name
+		m.setCursor(m.branchRow(r.branch))
 	}
 }
 
 func (m *Model) toggleSection(section string) {
-	r, ok := m.hovered()
-	if !ok || r.branch < 0 {
+	bi := m.hoveredBranch()
+	if bi < 0 {
 		return
 	}
-	k := sectionKey(m.snap.Branches[r.branch].Name, section)
+	name := m.snap.Branches[bi].Name
+	k := sectionKey(name, section)
 	m.expanded[k] = !m.expanded[k]
-	// Collapsing the section the cursor is inside parks it on the section.
-	if !m.expanded[k] && sectionOf(r) == section {
-		m.cursorKey = k
+	// Closing the section the cursor is inside puts it back on the branch.
+	if r, _ := m.hovered(); !m.expanded[k] && sectionOf(r) == section {
+		m.cursorKey = branchKey(name)
 	}
 	m.rebuild()
 }
@@ -393,15 +373,15 @@ func sectionOf(r row) string {
 }
 
 func (m *Model) toggleBranch() {
-	r, ok := m.hovered()
-	if !ok || r.branch < 0 {
+	bi := m.hoveredBranch()
+	if bi < 0 {
 		return
 	}
-	name := m.snap.Branches[r.branch].Name
+	name := m.snap.Branches[bi].Name
 	open := !m.branchExpanded(name)
 	m.setBranchExpanded(name, open)
 	if !open {
-		m.cursorKey = "branch\x00" + name
+		m.cursorKey = branchKey(name)
 	}
 	m.rebuild()
 }
@@ -424,11 +404,11 @@ func (m *Model) setBranchExpanded(name string, open bool) {
 // --- selection for review ---
 
 func (m *Model) toggleMark() {
-	r, ok := m.hovered()
-	if !ok || r.branch < 0 {
+	bi := m.hoveredBranch()
+	if bi < 0 {
 		return
 	}
-	name := m.snap.Branches[r.branch].Name
+	name := m.snap.Branches[bi].Name
 	if m.marks[name] {
 		delete(m.marks, name)
 	} else {
@@ -449,12 +429,12 @@ func (m *Model) toggleVisual() {
 		m.visual = false
 		return
 	}
-	r, ok := m.hovered()
-	if !ok || r.branch < 0 {
+	bi := m.hoveredBranch()
+	if bi < 0 {
 		return
 	}
 	m.visual = true
-	m.anchor = m.snap.Branches[r.branch].Name
+	m.anchor = m.snap.Branches[bi].Name
 }
 
 // --- hovered item actions ---
@@ -469,10 +449,6 @@ func (m *Model) openHovered() tea.Cmd {
 	switch r.kind {
 	case rowBranch:
 		url = pr
-	case rowSection:
-		if pr != "" {
-			url = pr + "/" + map[string]string{secFiles: "files", secCommits: "commits", secChecks: "checks"}[r.section]
-		}
 	case rowFile:
 		if pr != "" {
 			url = pr + "/files" + fileAnchor(r.file.Path)
@@ -509,24 +485,6 @@ func (m *Model) yankHovered() tea.Cmd {
 	switch r.kind {
 	case rowBranch:
 		return copyToClipboard(b.Name, b.Name)
-	case rowSection:
-		switch r.section {
-		case secFiles:
-			return m.yankFiles()
-		case secCommits:
-			var shas []string
-			for _, c := range b.Commits {
-				shas = append(shas, c.SHA)
-			}
-			return copyToClipboard(
-				strings.Join(shas, "\n"),
-				fmt.Sprintf("%d commit SHAs", len(shas)),
-			)
-		default:
-			if url := m.prURL(r.branch); url != "" {
-				return copyToClipboard(url+"/checks", "checks URL")
-			}
-		}
 	case rowFile:
 		return copyToClipboard(r.file.Path, r.file.Path)
 	case rowCommit:

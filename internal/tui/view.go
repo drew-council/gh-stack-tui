@@ -15,6 +15,9 @@ import (
 // outputPanelLines is the number of output lines shown under the stack.
 const outputPanelLines = 8
 
+// headerHeight is the header line plus the blank line under it.
+const headerHeight = 2
+
 func (m Model) View() tea.View {
 	v := tea.NewView(m.render())
 	v.AltScreen = true
@@ -68,74 +71,108 @@ func (m Model) bodyHeight() int {
 	return max(1, h)
 }
 
-// ensureVisible scrolls so the cursor row is on screen with a little context.
+// bodyTop is the screen row of the first body line.
+func (m Model) bodyTop() int { return len(m.headerLines()) }
+
+func (m Model) totalLines() int {
+	if len(m.rows) == 0 {
+		return 0
+	}
+	last := m.rows[len(m.rows)-1]
+	return last.y + last.height
+}
+
+func (m *Model) clampScroll() {
+	m.scroll = max(0, min(m.scroll, m.totalLines()-m.bodyHeight()))
+}
+
+// ensureVisible scrolls so the hovered branch, or the hovered item, is on
+// screen. A branch is shown whole where it fits, with its header line taking
+// priority when it does not.
 func (m *Model) ensureVisible() {
 	if len(m.rows) == 0 || m.height == 0 {
 		m.scroll = 0
 		return
 	}
 	h := m.bodyHeight()
-	last := m.rows[len(m.rows)-1]
-	total := last.y + last.height
-	r := m.rows[max(0, min(m.cursor, len(m.rows)-1))]
-	margin := min(2, h/4)
-	if r.y-margin < m.scroll {
-		m.scroll = r.y - margin
+	r, ok := m.hovered()
+	if !ok {
+		m.clampScroll()
+		return
 	}
-	if bottom := r.y + r.height + margin; bottom > m.scroll+h {
-		m.scroll = bottom - h
+	start, end := r.y, r.y+r.height
+	if r.kind == rowBranch {
+		start, end = m.nodeSpan(r.branch)
+	} else {
+		start, end = max(0, start-1), end+1
 	}
-	m.scroll = max(0, min(m.scroll, total-h))
+	if end > m.scroll+h {
+		m.scroll = end - h
+	}
+	if r.y < m.scroll {
+		m.scroll = r.y
+	}
+	if start < m.scroll && r.y-start < h {
+		m.scroll = start
+	}
+	m.clampScroll()
 }
 
 // --- header ---
 
 func (m Model) headerLines() []string {
-	left := titleStyle.Render("gh stack")
-	if s := m.snap; s != nil && s.Index >= 0 {
-		if s.Number != 0 {
-			left += " " + boldStyle.Render(fmt.Sprintf("#%d", s.Number))
+	s := m.st
+	left := s.title.Render("gh stack")
+	if snap := m.snap; snap != nil && snap.Index >= 0 {
+		if snap.Number != 0 {
+			left += " " + s.normal.Render(fmt.Sprintf("#%d", snap.Number))
 		}
-		if s.StackCount > 1 {
-			left += dimStyle.Render(fmt.Sprintf(" [%d/%d]", s.Index+1, s.StackCount))
+		if snap.StackCount > 1 {
+			left += s.dim.Render(fmt.Sprintf(" %d/%d", snap.Index+1, snap.StackCount))
 		}
 		merged := 0
-		for i := range s.Branches {
+		for i := range snap.Branches {
 			if m.merged(i) {
 				merged++
 			}
 		}
-		info := plural(len(s.Branches), "branch", "branches")
+		info := plural(len(snap.Branches), "branch", "branches")
 		if merged > 0 {
-			info += fmt.Sprintf(", %d merged", merged)
+			info += fmt.Sprintf(" (%d merged)", merged)
 		}
-		left += dimStyle.Render("  on ") + trunkStyle.Render(s.Trunk) + dimStyle.Render(" · "+info)
-		if s.CurrentBranch != "" {
-			left += dimStyle.Render(" · at ") + branchCurrentStyle.Render(s.CurrentBranch)
-		} else {
-			left += dimStyle.Render(" · ") + warnStyle.Render("detached HEAD")
+		left += s.dim.Render("  on ") + s.normal.Render(snap.Trunk) + s.dim.Render(" · "+info)
+		switch {
+		case snap.Rebasing:
+			left += s.dim.Render(
+				" · ",
+			) + s.err.Render(
+				"rebase in progress",
+			) + s.dim.Render(
+				"  rc continue · ra abort",
+			)
+		case snap.CurrentBranch != "":
+			left += s.dim.Render(" · at ") + s.branchCurrent.Render(snap.CurrentBranch)
+		default:
+			left += s.dim.Render(" · ") + s.warn.Render("detached HEAD")
 		}
-		if s.Dirty {
-			left += " " + warnStyle.Render("✎ uncommitted changes")
-		}
-		if s.Rebasing {
-			left += " " + errStyle.Render("⚠ REBASE IN PROGRESS (rc continue, ra abort)")
+		if snap.Dirty {
+			left += s.dim.Render(" · ") + s.warn.Render("uncommitted changes")
 		}
 		if m.pinned != "" {
-			left += " " + dimStyle.Render("(pinned)")
+			left += s.dim.Render(" · pinned")
 		}
 	}
 
 	var right string
 	switch {
 	case m.loadingRemote:
-		right = m.spinner.View() + dimStyle.Render(" refreshing")
+		right = m.spinner.View() + s.dim.Render(" refreshing")
 	case !m.lastRemote.IsZero():
-		right = dimStyle.Render("↻ " + shortAgo(m.lastRemote))
+		right = s.dim.Render("↻ " + shortAgo(m.lastRemote))
 	}
 	lines := []string{spread(left, right, m.width)}
 	if m.remoteErr != nil {
-		lines = append(lines, errStyle.Render("⚠ GitHub: "+firstLine(m.remoteErr.Error())))
+		lines = append(lines, s.err.Render("GitHub: "+firstLine(m.remoteErr.Error())))
 	}
 	return append(lines, "")
 }
@@ -151,87 +188,107 @@ func spread(left, right string, width int) string {
 // --- body ---
 
 func (m Model) bodyLines() []string {
+	s := m.st
 	switch {
 	case m.localErr != nil:
-		return []string{errStyle.Render("error: " + m.localErr.Error())}
+		return []string{s.err.Render("error: " + m.localErr.Error())}
 	case m.snap == nil:
-		return []string{m.spinner.View() + " loading stack…"}
+		return []string{m.spinner.View() + s.dim.Render(" loading stack…")}
 	case m.snap.Index < 0:
 		return []string{
-			dimStyle.Render("No stacks in this repository."),
-			dimStyle.Render(
-				"Create one with ",
-			) + keyStyle.Render(
-				"gh stack init",
-			) + dimStyle.Render(
-				", or : to run a gh stack command.",
-			),
+			s.dim.Render("No stacks in this repository."),
+			s.dim.Render("Create one with ") + s.normal.Render("gh stack init") +
+				s.dim.Render(", or press : to run a gh stack command."),
 		}
 	}
+	hb := m.hoveredBranch()
 	var lines []string
 	for i, r := range m.rows {
-		lines = append(lines, m.renderRow(r, i == m.cursor)...)
+		lines = append(
+			lines,
+			m.renderRow(r, i == m.cursor && m.navigable(i), r.branch >= 0 && r.branch == hb)...)
 	}
 	return lines
 }
 
-func (m Model) gutter(r row, focused bool, lineIdx int) string {
-	cur := " "
-	if focused && lineIdx == 0 {
-		cur = cursorStyle.Render(glyphCursor)
-	}
-	mark := " "
-	if r.kind == rowBranch && r.branch >= 0 {
-		name := m.snap.Branches[r.branch].Name
-		switch {
-		case m.marks[name]:
-			mark = markStyle.Render(glyphMark)
-		case m.visual && m.isSelected(r.branch, name):
-			mark = visualStyle.Render(glyphVisual)
-		}
-	}
-	return cur + mark + " "
-}
-
-func (m Model) connector(bi int, focused bool) string {
-	c := "│"
-	if b := m.snap.Branches[bi]; b.NeedsRebase && !m.merged(bi) {
-		c = "┊"
+// connector returns the tree line for branch bi and the style to draw it and
+// its bullet in. A focused branch draws its whole node in one color: accent
+// when it is checked out, purple when merged, yellow when queued, otherwise
+// the primary ink. Elsewhere the line is border-colored, or yellow and
+// dashed when the branch needs a rebase.
+func (m Model) connector(bi int, focused bool) (string, lipgloss.Style) {
+	s := m.st
+	b := m.snap.Branches[bi]
+	pr := m.prFor(bi)
+	merged := m.merged(bi)
+	queued := pr != nil && pr.Queued
+	glyph, style := glyphConn, s.conn
+	if b.NeedsRebase && !merged && !queued {
+		glyph, style = glyphDashed, s.connDashed
 	}
 	if focused {
-		return connFocusStyle.Render(c)
+		switch {
+		case b.IsCurrent:
+			style = s.connCurrent
+		case merged:
+			style = s.connMerged
+		case queued:
+			style = s.connQueued
+		default:
+			style = s.connFocus
+		}
 	}
-	return connStyle.Render(c)
+	return glyph, style
 }
 
-func (m Model) renderRow(r row, focused bool) []string {
-	label := func(s string, style lipgloss.Style) string {
-		if focused {
-			return focusStyle.Render(s)
-		}
-		return style.Render(s)
+func (m Model) statusIcon(bi int) string {
+	s := m.st
+	b := m.snap.Branches[bi]
+	pr := m.prFor(bi)
+	switch {
+	case m.merged(bi):
+		return s.iconMerged.Render(glyphMerged)
+	case pr != nil && pr.Queued:
+		return s.iconQueued.Render(glyphQueued)
+	case b.NeedsRebase:
+		return s.iconWarn.Render(glyphWarn)
+	case m.prNumber(bi) != 0:
+		return s.iconOpen.Render(glyphOpen)
 	}
+	return ""
+}
+
+// renderRow renders one row. cursor is true for the row under the cursor;
+// active is true for every row of the branch the cursor is on or inside.
+func (m Model) renderRow(r row, cursor, active bool) []string {
+	s := m.st
 	switch r.kind {
 	case rowSeparator:
 		return []string{
-			"   " + connStyle.Render(
-				"────",
-			) + dimStyle.Render(
-				" "+r.label+" ",
-			) + connStyle.Render(
-				"─────",
-			),
+			s.conn.Render("────") + s.dim.Render(" "+r.label+" ") + s.conn.Render("─────"),
 		}
 	case rowTrunk:
-		return []string{"   " + connStyle.Render("└ ") + trunkStyle.Render(r.label)}
-	case rowSpacer:
-		return []string{"   " + m.connector(r.branch, false)}
+		return []string{s.conn.Render(glyphTrunk+" ") + s.trunk.Render(r.label)}
 	case rowBranch:
-		return m.renderBranch(r, focused)
+		return m.renderBranch(r, cursor, active)
+	}
+
+	conn, cs := m.connector(r.branch, active)
+	line := cs.Render(conn)
+	if r.kind == rowSpacer {
+		return []string{line}
 	}
 
 	b := m.snap.Branches[r.branch]
-	prefix := m.gutter(r, focused, 0) + m.connector(r.branch, false) + "   "
+	// Items indent four columns past the connector; the cursor takes the
+	// last two of them, so focused and unfocused text line up.
+	indent := func(n int) string {
+		if cursor {
+			return strings.Repeat(" ", n-2) + cs.Render(glyphFocus) + " "
+		}
+		return strings.Repeat(" ", n)
+	}
+
 	switch r.kind {
 	case rowSection:
 		glyph := glyphCollapsed
@@ -242,231 +299,181 @@ func (m Model) renderRow(r row, focused bool) []string {
 		switch r.section {
 		case secFiles:
 			text = plural(len(b.Files), "file changed", "files changed")
-			extra = "  " + diffStat(b.Additions, b.Deletions)
 		case secCommits:
 			text = plural(len(b.Commits), "commit", "commits")
 		case secChecks:
 			pr := m.prFor(r.branch)
-			text = "checks"
-			extra = "  " + checkSummary(pr.Checks)
-			return []string{
-				prefix + sectionStyle.Render(
-					glyph+" ",
-				) + checkGlyph(
-					pr.Checks.State,
-				) + " " + label(
-					text,
-					sectionStyle,
-				) + extra,
+			n := 0
+			for _, w := range pr.Checks.Workflows {
+				n += len(w.Checks)
 			}
+			text = plural(n, "check", "checks")
+			extra = "  " + m.checkSummary(pr.Checks)
 		}
-		return []string{prefix + sectionStyle.Render(glyph+" ") + label(text, sectionStyle) + extra}
+		return []string{line + "  " + s.dim.Render(glyph+" "+text) + extra}
 
 	case rowFile:
 		f := r.file
-		status := f.Status
-		if status == "" {
-			status = "M"
-		}
-		stat := diffStat(f.Additions, f.Deletions)
+		path := truncateLeft(f.Path, m.width-30)
+		stat := m.diffStat(f.Additions, f.Deletions)
 		if f.Binary {
-			stat = dimStyle.Render("binary")
+			stat = s.dim.Render("binary")
 		}
-		return []string{
-			prefix + "  " + fileStatusStyle(
-				status,
-			).Render(status) +
-				" " + label(
-				f.Path,
-				branchStyle,
-			) + "  " + stat,
-		}
+		return []string{line + indent(4) + s.normal.Render(path) + "  " + stat}
 
 	case rowCommit:
 		c := r.commit
+		subject := truncateRight(c.Subject, m.width-35)
 		return []string{
-			prefix + "  " + shaStyle.Render(
-				c.SHA[:min(7, len(c.SHA))],
-			) + " " + label(
-				c.Subject,
-				branchStyle,
-			) +
-				dimStyle.Render(
-					"  "+c.Author+", "+shortAgo(c.Time),
-				),
+			line + indent(4) + s.sha.Render(c.SHA[:min(7, len(c.SHA))]) + " " +
+				s.normal.Render(subject) + "  " + s.dim.Render(timeAgo(c.Time)),
 		}
 
 	case rowWorkflow:
 		w := r.workflow
-		glyph := glyphCollapsed
-		if m.expanded[r.key] {
-			glyph = glyphExpanded
-		}
 		return []string{
-			prefix + "  " + sectionStyle.Render(
-				glyph+" ",
-			) + checkGlyph(
-				w.State,
-			) + " " + label(
-				w.Name,
-				branchStyle,
-			) +
-				"  " + dimStyle.Render(
-				checkCounts(w.Checks),
-			),
+			line + indent(4) + s.checkGlyph(w.State) + " " + s.normal.Render(w.Name) +
+				"  " + m.checkCounts(w.Checks),
 		}
 
 	case rowCheck:
 		c := r.check
-		return []string{prefix + "      " + checkGlyph(c.State) + " " + label(c.Name, branchStyle)}
+		return []string{line + indent(6) + s.checkGlyph(c.State) + " " + s.normal.Render(c.Name)}
 	}
 	return nil
 }
 
-func (m Model) renderBranch(r row, focused bool) []string {
+func (m Model) renderBranch(r row, cursor, active bool) []string {
+	s := m.st
 	b := m.snap.Branches[r.branch]
 	pr := m.prFor(r.branch)
 	merged := m.merged(r.branch)
+	conn, cs := m.connector(r.branch, active)
 
-	bullet := connStyle.Render("├ ")
-	if focused {
-		bullet = connFocusStyle.Render("├ ")
+	bullet := glyphBullet
+	if cursor {
+		bullet = glyphFocus
+	}
+	head := cs.Render(bullet + " ")
+	if icon := m.statusIcon(r.branch); icon != "" {
+		head += icon + " "
 	}
 
-	var icon string
-	switch {
-	case merged:
-		icon = mergedStyle.Render(glyphMerged)
-	case pr != nil && pr.Queued:
-		icon = queuedStyle.Render(glyphQueued)
-	case b.NeedsRebase:
-		icon = warnStyle.Render(glyphWarn)
-	case pr != nil && pr.IsDraft:
-		icon = draftStyle.Render(glyphOpen)
-	case pr != nil || b.PR != nil:
-		icon = openStyle.Render(glyphOpen)
-	default:
-		icon = dimStyle.Render("·")
-	}
-
-	nameStyle := branchStyle
 	name := b.Name
+	var styledName string
 	switch {
 	case b.IsCurrent:
-		nameStyle = branchCurrentStyle
+		styledName = s.branchCurrent.Render(name + " (current)")
 	case merged:
-		nameStyle = branchMergedStyle
+		styledName = s.branchMerged.Render(name)
+	default:
+		styledName = s.branch.Render(name)
 	}
-	styledName := nameStyle.Render(name)
-	if focused {
-		styledName = focusStyle.Inherit(nameStyle).Render(name)
-	}
-	line := m.gutter(r, focused, 0) + bullet + icon + " " + styledName
-	if b.IsCurrent {
-		line += " " + branchCurrentStyle.Render("(current)")
-	}
+	branchLine := styledName
 	if b.Additions > 0 || b.Deletions > 0 {
-		line += "  " + diffStat(b.Additions, b.Deletions)
-	}
-	if b.NeedsRebase && !merged {
-		line += "  " + warnStyle.Render("needs rebase")
+		branchLine += "  " + m.diffStat(b.Additions, b.Deletions)
 	}
 	if b.Head == "" && !merged {
-		line += "  " + dimStyle.Render("(no local branch)")
+		branchLine += "  " + s.dim.Render("no local branch")
 	}
-	lines := []string{line}
-	if r.height < 2 {
-		return lines
+	if m.marks[name] || (m.visual && m.isSelected(r.branch, name)) {
+		branchLine += "  " + s.selected.Render("selected")
 	}
 
-	second := m.gutter(r, focused, 1) + m.connector(r.branch, focused) + "   "
+	if r.height < 2 {
+		return []string{head + branchLine}
+	}
+
+	// PR line on top, branch line under it, like gh stack view.
 	num := m.prNumber(r.branch)
-	second += prNumStyle.Render(fmt.Sprintf("#%d", num))
-	if pr == nil {
-		if m.loadingRemote || m.lastRemote.IsZero() {
-			second += " " + m.spinner.View()
+	prLine := head + s.prLink.Render(fmt.Sprintf("#%d", num))
+	switch {
+	case pr == nil && merged:
+		prLine += " " + s.prMerged.Render("MERGED")
+	case pr == nil:
+		if m.loadingRemote || (m.lastRemote.IsZero() && m.remoteErr == nil) {
+			prLine += " " + m.spinner.View()
 		}
-		return append(lines, second)
+	default:
+		prLine += " " + m.prStateLabel(pr)
+		if pr.State == "OPEN" && !pr.Queued {
+			if len(pr.Checks.Workflows) > 0 {
+				prLine += "  " + s.checkGlyph(pr.Checks.State) + s.dim.Render(" checks")
+			}
+			switch pr.ReviewDecision {
+			case "APPROVED":
+				prLine += "  " + s.ok.Render("approved")
+			case "CHANGES_REQUESTED":
+				prLine += "  " + s.err.Render("changes requested")
+			}
+			switch pr.MergeState {
+			case "DIRTY":
+				prLine += "  " + s.err.Render("conflicts")
+			case "BEHIND":
+				prLine += "  " + s.warn.Render("behind base")
+			}
+		}
+		if pr.Title != "" {
+			room := m.width - lipgloss.Width(prLine) - 2
+			if room >= 12 {
+				prLine += "  " + s.dim.Render(truncateRight(pr.Title, room))
+			}
+		}
 	}
-	second += " " + prStateLabel(pr)
-	if pr.State == "OPEN" {
-		if len(pr.Checks.Workflows) > 0 {
-			second += "  " + checkGlyph(pr.Checks.State) + dimStyle.Render(" CI")
-		}
-		switch pr.ReviewDecision {
-		case "APPROVED":
-			second += "  " + okStyle.Render("approved")
-		case "CHANGES_REQUESTED":
-			second += "  " + errStyle.Render("changes requested")
-		case "REVIEW_REQUIRED":
-			second += "  " + dimStyle.Render("review required")
-		}
-		switch pr.MergeState {
-		case "DIRTY":
-			second += "  " + errStyle.Render("conflicts")
-		case "BEHIND":
-			second += "  " + warnStyle.Render("behind base")
-		}
-	}
-	if pr.Title != "" {
-		second += dimStyle.Render("  " + pr.Title)
-	}
-	return append(lines, second)
+	return []string{prLine, cs.Render(conn) + " " + branchLine}
 }
 
-func prStateLabel(pr *github.PR) string {
+func (m Model) prStateLabel(pr *github.PR) string {
+	s := m.st
 	switch {
 	case pr.Merged:
-		return mergedStyle.Render("MERGED")
+		return s.prMerged.Render("MERGED")
 	case pr.Queued:
-		return queuedStyle.Render("QUEUED")
+		return s.prQueued.Render("QUEUED")
 	case pr.State == "CLOSED":
-		return closedStyle.Render("CLOSED")
+		return s.prClosed.Render("CLOSED")
 	case pr.IsDraft:
-		return draftStyle.Render("DRAFT")
+		return s.prDraft.Render("DRAFT")
 	default:
-		return openStyle.Render("OPEN")
+		return s.prOpen.Render("OPEN")
 	}
 }
 
-func checkSummary(r github.Rollup) string {
+func (m Model) checkSummary(r github.Rollup) string {
 	var all []github.Check
 	for _, w := range r.Workflows {
 		all = append(all, w.Checks...)
 	}
-	return dimStyle.Render(
-		plural(len(r.Workflows), "workflow", "workflows")+", ",
-	) + checkCounts(
-		all,
-	)
+	return m.checkCounts(all)
 }
 
-func checkCounts(checks []github.Check) string {
+func (m Model) checkCounts(checks []github.Check) string {
+	s := m.st
 	counts := map[github.CheckState]int{}
 	for _, c := range checks {
 		counts[c.State]++
 	}
 	var parts []string
-	for _, s := range []struct {
+	for _, st := range []struct {
 		state github.CheckState
 		word  string
 		style lipgloss.Style
 	}{
-		{github.CheckFailure, "failed", errStyle},
-		{github.CheckPending, "running", warnStyle},
-		{github.CheckCancelled, "cancelled", dimStyle},
-		{github.CheckSuccess, "passed", okStyle},
-		{github.CheckSkipped, "skipped", dimStyle},
+		{github.CheckFailure, "failed", s.err},
+		{github.CheckPending, "running", s.warn},
+		{github.CheckCancelled, "cancelled", s.dim},
+		{github.CheckSuccess, "passed", s.ok},
+		{github.CheckSkipped, "skipped", s.dim},
 	} {
-		if n := counts[s.state]; n > 0 {
-			parts = append(parts, s.style.Render(fmt.Sprintf("%d %s", n, s.word)))
+		if n := counts[st.state]; n > 0 {
+			parts = append(parts, st.style.Render(fmt.Sprintf("%d %s", n, st.word)))
 		}
 	}
-	return strings.Join(parts, dimStyle.Render(" · "))
+	return strings.Join(parts, s.dim.Render(" · "))
 }
 
-func diffStat(add, del int) string {
-	return addStyle.Render(fmt.Sprintf("+%d", add)) + " " + delStyle.Render(fmt.Sprintf("-%d", del))
+func (m Model) diffStat(add, del int) string {
+	return m.st.add.Render(fmt.Sprintf("+%d", add)) + " " + m.st.del.Render(fmt.Sprintf("-%d", del))
 }
 
 func plural(n int, one, many string) string {
@@ -476,6 +483,48 @@ func plural(n int, one, many string) string {
 	return fmt.Sprintf("%d %s", n, many)
 }
 
+// truncateLeft keeps the tail of a path, which is the distinctive part.
+func truncateLeft(s string, maxLen int) string {
+	maxLen = max(20, maxLen)
+	r := []rune(s)
+	if len(r) <= maxLen {
+		return s
+	}
+	return "…" + string(r[len(r)-maxLen+1:])
+}
+
+func truncateRight(s string, maxLen int) string {
+	maxLen = max(12, maxLen)
+	r := []rune(s)
+	if len(r) <= maxLen {
+		return s
+	}
+	return string(r[:maxLen-1]) + "…"
+}
+
+// timeAgo matches gh stack view's wording for commit times.
+func timeAgo(t time.Time) string {
+	d := time.Since(t)
+	n, unit := 0, ""
+	switch {
+	case d < time.Minute:
+		n, unit = int(d.Seconds()), "second"
+	case d < time.Hour:
+		n, unit = int(d.Minutes()), "minute"
+	case d < 24*time.Hour:
+		n, unit = int(d.Hours()), "hour"
+	case d < 30*24*time.Hour:
+		n, unit = int(d.Hours()/24), "day"
+	default:
+		n, unit = max(1, int(d.Hours()/24/30)), "month"
+	}
+	if n == 1 {
+		return "1 " + unit + " ago"
+	}
+	return fmt.Sprintf("%d %ss ago", n, unit)
+}
+
+// shortAgo is the compact form used for the refresh indicator.
 func shortAgo(t time.Time) string {
 	d := time.Since(t)
 	switch {
@@ -498,6 +547,7 @@ func firstLine(s string) string {
 // --- output panel ---
 
 func (m Model) outputLines() []string {
+	s := m.st
 	var status string
 	switch m.outputState {
 	case opRunning:
@@ -505,18 +555,18 @@ func (m Model) outputLines() []string {
 		if m.op != nil {
 			elapsed = fmt.Sprintf(" %ds", int(time.Since(m.op.started).Seconds()))
 		}
-		status = m.spinner.View() + warnStyle.Render(" running"+elapsed)
+		status = m.spinner.View() + s.warn.Render(" running"+elapsed)
 	case opSucceeded:
-		status = okStyle.Render("✓ done")
+		status = s.ok.Render("✓ done")
 	case opFailed:
-		status = errStyle.Render("✗ failed")
+		status = s.err.Render("✗ failed")
 	}
-	title := connStyle.Render("── ") + boldStyle.Render(m.outputTitle) + " " + status + " "
-	title += connStyle.Render(
-		strings.Repeat("─", max(0, m.width-lipgloss.Width(title)-12)),
-	) + dimStyle.Render(
-		" ! hide",
+	title := s.rule.Render("── ") + s.title.Render(m.outputTitle) + " " + status + " "
+	hide := s.key.Render("!") + s.keyDesc.Render(" hide")
+	title += s.rule.Render(
+		strings.Repeat("─", max(0, m.width-lipgloss.Width(title)-lipgloss.Width(hide)-2)),
 	)
+	title += " " + hide
 
 	out := m.output
 	if len(out) > outputPanelLines {
@@ -524,7 +574,7 @@ func (m Model) outputLines() []string {
 	}
 	lines := []string{title}
 	for _, l := range out {
-		lines = append(lines, dimStyle.Render(l))
+		lines = append(lines, s.dim.Render(l))
 	}
 	for len(lines) < outputPanelLines+1 {
 		lines = append(lines, "")
@@ -535,42 +585,32 @@ func (m Model) outputLines() []string {
 // --- footer ---
 
 func (m Model) footer() string {
+	s := m.st
 	switch m.mode {
 	case modePrompt:
 		p := "gh stack add "
 		if m.promptKind == promptCommand {
 			p = "gh stack "
 		}
-		return keyStyle.Render(p) + m.input.View()
+		return s.prompt.Render(p) + m.input.View()
 	case modeConfirm:
-		return warnStyle.Render(m.confirm.text)
+		return s.warn.Render(m.confirm.text)
 	case modeHelp:
-		return dimStyle.Render("press any key to close help")
+		return s.dim.Render("press any key to close help")
 	}
 	switch m.pendingKey {
 	case "r":
-		return keyStyle.Render(
-			"rebase: ",
-		) + hints(
-			"r",
-			"whole stack",
-			"u",
-			"upstack",
-			"d",
-			"downstack",
-			"c",
-			"continue",
-			"a",
-			"abort",
+		return s.prompt.Render("rebase ") + m.hints(
+			"r", "whole stack", "u", "upstack", "d", "downstack", "c", "continue", "a", "abort",
 		)
 	case "g":
-		return keyStyle.Render("g") + dimStyle.Render("…")
+		return s.prompt.Render("g") + s.dim.Render("…")
 	}
 	if m.flash != "" {
 		if m.flashErr {
-			return errStyle.Render(m.flash)
+			return s.flashErr.Render(m.flash)
 		}
-		return okStyle.Render(m.flash)
+		return s.flashOK.Render(m.flash)
 	}
 	if m.visual || len(m.marks) > 0 {
 		n := 0
@@ -581,64 +621,47 @@ func (m Model) footer() string {
 				}
 			}
 		}
-		mode := "SELECT"
+		mode := "select"
 		if m.visual {
-			mode = "VISUAL"
+			mode = "visual"
 		}
-		return markStyle.Render(
-			fmt.Sprintf("-- %s -- %d selected  ", mode, n),
-		) + hints(
-			"R",
-			"review",
-			"space",
-			"mark",
-			"v",
-			"end visual",
-			"esc",
-			"clear",
+		return s.selected.Render(mode) + s.dim.Render(fmt.Sprintf(" %d selected  ", n)) +
+			m.hints("R", "review", "space", "mark", "v", "end visual", "esc", "clear")
+	}
+	if r, ok := m.hovered(); ok && r.item() {
+		return m.hints(
+			"j/k", "items", "h", "back", "o", "open", "y", "copy", "e", "edit", "?", "help",
 		)
 	}
-	return hints(
-		"j/k",
-		"move",
-		"l/h",
-		"expand",
-		"o",
-		"open",
-		"y",
-		"copy",
-		"c",
-		"checkout",
-		"p",
-		"push",
-		"s",
-		"sync",
-		"P",
-		"prune",
-		"R",
-		"review",
-		"?",
-		"help",
+	return m.hints(
+		"j/k", "navigate", "l/h", "expand", "o", "open", "y", "copy", "c", "checkout",
+		"p", "push", "s", "sync", "R", "review", "?", "help",
 	)
 }
 
-func hints(pairs ...string) string {
+func (m Model) hints(pairs ...string) string {
 	var parts []string
 	for i := 0; i+1 < len(pairs); i += 2 {
-		parts = append(parts, keyStyle.Render(pairs[i])+" "+dimStyle.Render(pairs[i+1]))
+		parts = append(parts, m.st.key.Render(pairs[i])+m.st.keyDesc.Render(" "+pairs[i+1]))
 	}
-	return strings.Join(parts, dimStyle.Render(" · "))
+	return strings.Join(parts, "  ")
 }
 
 // --- help ---
 
 func (m Model) helpLines() []string {
+	s := m.st
 	var cols []string
-	for _, s := range helpSections {
+	for _, sec := range helpSections {
 		var b strings.Builder
-		b.WriteString(boldStyle.Render(s.title) + "\n")
-		for _, k := range s.keys {
-			fmt.Fprintf(&b, "%s %s\n", keyStyle.Render(fmt.Sprintf("%-10s", k[0])), k[1])
+		b.WriteString(s.title.Render(sec.title) + "\n")
+		for _, k := range sec.keys {
+			fmt.Fprintf(
+				&b,
+				"%s %s\n",
+				s.key.Render(fmt.Sprintf("%-10s", k[0])),
+				s.keyDesc.Render(k[1]),
+			)
 		}
 		cols = append(cols, lipgloss.NewStyle().MarginRight(3).Render(b.String()))
 	}
