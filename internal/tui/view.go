@@ -400,12 +400,6 @@ func (m Model) renderBranch(r row, cursor, active bool) []string {
 			if len(pr.Checks.Workflows) > 0 {
 				prLine += "  " + s.checkGlyph(pr.Checks.State) + s.dim.Render(" checks")
 			}
-			switch pr.ReviewDecision {
-			case "APPROVED":
-				prLine += "  " + s.ok.Render("approved")
-			case "CHANGES_REQUESTED":
-				prLine += "  " + s.err.Render("changes requested")
-			}
 			switch pr.MergeState {
 			case "DIRTY":
 				prLine += "  " + s.err.Render("conflicts")
@@ -420,7 +414,38 @@ func (m Model) renderBranch(r row, cursor, active bool) []string {
 			}
 		}
 	}
-	return []string{prLine, cs.Render(conn) + " " + branchLine}
+	lines := []string{prLine, cs.Render(conn) + " " + branchLine}
+	if review := m.reviewLine(r.branch); review != "" {
+		lines = append(lines, cs.Render(conn)+" "+review)
+	}
+	return lines
+}
+
+// reviewLine is the review status of branch bi's PR: whether it is ready
+// for review, approved, or has changes requested, and how many review
+// threads are still open. It is empty when there is nothing to say.
+func (m Model) reviewLine(bi int) string {
+	s := m.st
+	pr := m.prFor(bi)
+	if pr == nil {
+		return ""
+	}
+	var parts []string
+	switch pr.Review() {
+	case github.ReviewReady:
+		parts = append(parts, s.dim.Render("ready for review"))
+	case github.ReviewApproved:
+		parts = append(parts, s.ok.Render("approved"))
+	case github.ReviewChangesRequested:
+		parts = append(parts, s.err.Render("changes requested"))
+	}
+	if pr.Unresolved > 0 && pr.State == "OPEN" {
+		parts = append(
+			parts,
+			s.warn.Render(plural(pr.Unresolved, "unresolved comment", "unresolved comments")),
+		)
+	}
+	return strings.Join(parts, s.dim.Render(" · "))
 }
 
 func (m Model) prStateLabel(pr *github.PR) string {

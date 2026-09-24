@@ -72,3 +72,27 @@ func TestCheckRunState(t *testing.T) {
 		}
 	}
 }
+
+func TestReviewStatus(t *testing.T) {
+	cases := []struct {
+		pr   PR
+		want ReviewStatus
+	}{
+		{PR{State: "OPEN"}, ReviewReady},
+		{PR{State: "OPEN", ReviewDecision: "REVIEW_REQUIRED"}, ReviewReady},
+		{PR{State: "OPEN", ReviewDecision: "APPROVED"}, ReviewApproved},
+		{PR{State: "OPEN", Approvals: 2}, ReviewApproved},
+		{
+			PR{State: "OPEN", ReviewDecision: "APPROVED", ChangesRequested: 1},
+			ReviewChangesRequested,
+		},
+		{PR{State: "OPEN", ReviewDecision: "CHANGES_REQUESTED"}, ReviewChangesRequested},
+		{PR{State: "OPEN", IsDraft: true, Approvals: 1}, ReviewNone},
+		{PR{State: "MERGED", Merged: true}, ReviewNone},
+	}
+	for _, c := range cases {
+		if got := c.pr.Review(); got != c.want {
+			t.Errorf("%+v: Review() = %v, want %v", c.pr, got, c.want)
+		}
+	}
+}

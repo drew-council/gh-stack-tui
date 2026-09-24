@@ -39,10 +39,44 @@ type PR struct {
 	MergeState     string // mergeStateStatus: CLEAN, BLOCKED, DIRTY, BEHIND, ...
 	HeadSHA        string
 	Checks         Rollup
+	// Approvals and ChangesRequested count reviewers whose latest review
+	// says so. They fill in for ReviewDecision, which is empty when the
+	// repository does not require reviews.
+	Approvals        int
+	ChangesRequested int
+	// Unresolved is the number of review threads still open.
+	Unresolved int
+}
+
+// ReviewStatus summarizes where an open PR stands with its reviewers.
+type ReviewStatus int
+
+const (
+	ReviewNone  ReviewStatus = iota // draft, merged, or closed: nothing to say
+	ReviewReady                     // ready for review, nobody has weighed in
+	ReviewApproved
+	ReviewChangesRequested
+)
+
+// Review derives the review status from the decision GitHub computes when
+// reviews are required, falling back to the latest review of each reviewer.
+func (pr *PR) Review() ReviewStatus {
+	if pr.State != "OPEN" || pr.IsDraft || pr.Merged {
+		return ReviewNone
+	}
+	switch {
+	case pr.ReviewDecision == "CHANGES_REQUESTED" || pr.ChangesRequested > 0:
+		return ReviewChangesRequested
+	case pr.ReviewDecision == "APPROVED" || (pr.ReviewDecision == "" && pr.Approvals > 0):
+		return ReviewApproved
+	}
+	return ReviewReady
 }
 
 const prFields = `number url title state isDraft merged reviewDecision mergeStateStatus
   mergeQueueEntry { state }
+  latestOpinionatedReviews(first: 100) { nodes { state } }
+  reviewThreads(first: 100) { nodes { isResolved } }
   commits(last: 1) { nodes { commit { oid statusCheckRollup { state contexts(first: 100) { nodes {
     __typename
     ... on CheckRun { name status conclusion detailsUrl startedAt
@@ -171,6 +205,16 @@ type prNode struct {
 	MergeQueueEntry  *struct {
 		State string `json:"state"`
 	} `json:"mergeQueueEntry"`
+	LatestOpinionatedReviews struct {
+		Nodes []struct {
+			State string `json:"state"`
+		} `json:"nodes"`
+	} `json:"latestOpinionatedReviews"`
+	ReviewThreads struct {
+		Nodes []struct {
+			IsResolved bool `json:"isResolved"`
+		} `json:"nodes"`
+	} `json:"reviewThreads"`
 	Commits struct {
 		Nodes []struct {
 			Commit struct {
@@ -226,6 +270,19 @@ func (n *prNode) toPR() *PR {
 		Queued:         n.MergeQueueEntry != nil,
 		ReviewDecision: n.ReviewDecision,
 		MergeState:     n.MergeStateStatus,
+	}
+	for _, r := range n.LatestOpinionatedReviews.Nodes {
+		switch r.State {
+		case "APPROVED":
+			pr.Approvals++
+		case "CHANGES_REQUESTED":
+			pr.ChangesRequested++
+		}
+	}
+	for _, t := range n.ReviewThreads.Nodes {
+		if !t.IsResolved {
+			pr.Unresolved++
+		}
 	}
 	if len(n.Commits.Nodes) > 0 {
 		c := n.Commits.Nodes[0].Commit

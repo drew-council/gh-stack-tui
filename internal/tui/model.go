@@ -295,7 +295,7 @@ func (m *Model) click(x, y int) tea.Cmd {
 		case m.navigable(i):
 			m.setCursor(i)
 			// The PR number sits right after the bullet and status icon.
-			if r.kind == rowBranch && r.height == 2 && line == r.y && x >= 2 && x < 12 {
+			if r.kind == rowBranch && r.height >= 2 && line == r.y && x >= 2 && x < 12 {
 				if url := m.prURL(r.branch); url != "" {
 					return openBrowser(url)
 				}

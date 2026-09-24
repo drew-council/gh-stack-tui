@@ -88,10 +88,13 @@ func (m *Model) buildRows() {
 		prevMerged = merged
 
 		// Like gh stack view, a branch with a PR takes two lines: the PR
-		// line on top, then the branch line.
+		// line on top, then the branch line. Review status adds a third.
 		height := 1
 		if m.prNumber(i) != 0 {
 			height = 2
+			if m.reviewLine(i) != "" {
+				height = 3
+			}
 		}
 		add(row{kind: rowBranch, key: branchKey(b.Name), branch: i, height: height})
 
