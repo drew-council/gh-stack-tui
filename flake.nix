@@ -35,7 +35,8 @@
           packages = with pkgs; [
             (aspellWithDicts (ps: with ps; [ en ]))
             nushell
-            go
+            go_1_27
+            gopls
             golines
             gofumpt
           ];

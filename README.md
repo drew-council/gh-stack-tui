@@ -1,5 +1,13 @@
 # gh-stack-tui
 
+A terminal UI for monitoring [gh-stack](https://github.com/github/gh-stack) state, built with [Bubble Tea](https://github.com/charmbracelet/bubbletea).
+
+## Development
+
+```sh
+go run .
+```
+
 This project uses Nix and direnv for a reproducible development environment.
 
 Configured languages: go.
