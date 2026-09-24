@@ -1,0 +1,9 @@
+formatter:
+  type: basic
+  drop_merge_tag: true
+  scan_folded_as_literal: true
+  line_ending: lf
+  indent: 2
+  retain_line_breaks_single: true
+  trim_trailing_whitespace: true
+  eof_newline: true
