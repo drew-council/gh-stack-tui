@@ -234,6 +234,13 @@ func TestOpsRequireCheckedOutStack(t *testing.T) {
 	}
 }
 
+func TestMarkReadyNeedsDraft(t *testing.T) {
+	m := press(testModel(), "D")
+	if m.op != nil || !m.flashErr {
+		t.Fatal("D should refuse on a PR that is not a draft")
+	}
+}
+
 func TestRenderLayout(t *testing.T) {
 	m := press(testModel(), "f", "x", "l", "j")
 	var lines []string

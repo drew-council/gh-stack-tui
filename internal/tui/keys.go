@@ -55,6 +55,7 @@ var helpSections = []helpSection{
 		{"e", "edit file in $EDITOR"},
 		{"c", "checkout branch"},
 		{"M", "merge PR (and below)"},
+		{"D", "mark draft PR(s) ready for review"},
 	}},
 	{"stack", [][2]string{
 		{"p", "push"},
@@ -184,6 +185,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		cmd = m.checkoutHovered()
 	case "M":
 		cmd = m.confirmMerge()
+	case "D":
+		cmd = m.markReady()
 
 	// stack operations
 	case "p":
@@ -587,6 +590,32 @@ func (m *Model) confirmMerge() tea.Cmd {
 		},
 	}
 	return nil
+}
+
+// markReady marks the draft PRs of the review selection (marks, visual
+// range, or the hovered branch) ready for review.
+func (m *Model) markReady() tea.Cmd {
+	if m.snap == nil || len(m.snap.Branches) == 0 {
+		return nil
+	}
+	var nums []string
+	for _, i := range m.reviewSelection() {
+		if pr := m.prFor(i); pr != nil && pr.IsDraft && pr.State == "OPEN" {
+			nums = append(nums, fmt.Sprint(pr.Number))
+		}
+	}
+	if len(nums) == 0 {
+		return m.setFlash("no open draft PR selected", true)
+	}
+	m.marks = map[string]bool{}
+	m.visual = false
+	if len(nums) == 1 {
+		return m.runOp("ready #"+nums[0], "gh", "pr", "ready", nums[0])
+	}
+	// gh pr ready takes one PR at a time.
+	title := fmt.Sprintf("ready %d PRs", len(nums))
+	script := `for n; do gh pr ready "$n" || exit; done`
+	return m.runOp(title, "sh", append([]string{"-c", script, "sh"}, nums...)...)
 }
 
 func (m *Model) confirmUnstack() tea.Cmd {
