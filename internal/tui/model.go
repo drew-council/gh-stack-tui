@@ -181,19 +181,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.finishOp(msg)
 
 	case execDoneMsg:
+		var flash tea.Cmd
 		if msg.err != nil {
-			m.setFlash(msg.what+": "+msg.err.Error(), true)
+			flash = m.setFlash(msg.what+": "+msg.err.Error(), true)
 		} else if msg.what != "" {
-			m.setFlash(msg.what+" finished", false)
+			flash = m.setFlash(msg.what+" finished", false)
 		}
-		return m, tea.Batch(m.requestLocal(), m.requestRemote())
+		return m, tea.Batch(flash, m.requestLocal(), m.requestRemote())
 
 	case flashMsg:
-		m.setFlash(msg.text, msg.err)
+		flash := m.setFlash(msg.text, msg.err)
 		if msg.refresh {
-			return m, tea.Batch(m.requestLocal(), m.requestRemote())
+			return m, tea.Batch(flash, m.requestLocal(), m.requestRemote())
 		}
-		return m, nil
+		return m, flash
 
 	case clearFlashMsg:
 		if msg.seq == m.flashSeq {
