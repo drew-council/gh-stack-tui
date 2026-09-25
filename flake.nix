@@ -42,6 +42,20 @@
           ];
         };
 
+        packages = rec {
+          ghst = (pkgs.buildGoModule.override { go = pkgs.go_1_27; }) {
+            pname = "ghst";
+            version = "0.1.0";
+            src = ./.;
+            nativeBuildInputs = [ pkgs.git ];
+            vendorHash = "sha256-nuJ2kgPC9EOfIPEMsuLXDrIV29Sp+yIQpZFWRTfishM=";
+            postInstall = ''
+              mv $out/bin/gh-stack-tui $out/bin/ghst
+            '';
+          };
+          default = ghst;
+        };
+
         formatter = treefmtEval.config.build.wrapper;
         checks.formatting = treefmtEval.config.build.check self;
       }
