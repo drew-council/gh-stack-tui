@@ -23,6 +23,9 @@ type Options struct {
 	StackNumber int
 	// ReviewCmd is the review command; {range} is replaced by base..head.
 	ReviewCmd string
+	// ReviewPRCmd reviews a single branch that has an open PR; {pr} is
+	// replaced by the PR number. Empty always reviews the commit range.
+	ReviewPRCmd string
 	// ReviewIn picks where the review opens: auto, herdr, tmux, or inline.
 	ReviewIn string
 }

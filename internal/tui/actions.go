@@ -317,6 +317,37 @@ func (m *Model) reviewRange(sel []int) (rng string, gap bool, err error) {
 	return bottom.DiffBase + ".." + top.Head, gap, nil
 }
 
+// reviewPR returns the number of branch i's PR when it can be reviewed on
+// GitHub: open or draft, from live data when loaded, else the stack file.
+func (m *Model) reviewPR(i int) int {
+	if pr := m.prFor(i); pr != nil {
+		if pr.State != "OPEN" || pr.Merged {
+			return 0
+		}
+		return pr.Number
+	}
+	return m.prNumber(i)
+}
+
+// reviewCommand builds the review command for a selection. A single branch
+// with an open PR is reviewed as that PR, so comments can be posted to it;
+// anything else is reviewed as a commit range.
+func (m *Model) reviewCommand(sel []int) (command, note string, err error) {
+	if len(sel) == 1 && m.opts.ReviewPRCmd != "" {
+		if n := m.reviewPR(sel[0]); n > 0 {
+			return strings.ReplaceAll(m.opts.ReviewPRCmd, "{pr}", fmt.Sprint(n)), "", nil
+		}
+	}
+	rng, gap, err := m.reviewRange(sel)
+	if err != nil {
+		return "", "", err
+	}
+	if gap {
+		note = " (selection not contiguous, layers in between included)"
+	}
+	return strings.ReplaceAll(m.opts.ReviewCmd, "{range}", rng), note, nil
+}
+
 func (m *Model) startReview() tea.Cmd {
 	if m.snap == nil || len(m.snap.Branches) == 0 {
 		return nil
@@ -325,7 +356,7 @@ func (m *Model) startReview() tea.Cmd {
 	if len(sel) == 0 {
 		return m.setFlash("nothing selected to review", true)
 	}
-	rng, gap, err := m.reviewRange(sel)
+	command, note, err := m.reviewCommand(sel)
 	if err != nil {
 		return m.setFlash("review: "+err.Error(), true)
 	}
@@ -337,15 +368,10 @@ func (m *Model) startReview() tea.Cmd {
 	if len(names) > 1 {
 		label = fmt.Sprintf("review %s +%d", shortBranch(names[len(names)-1]), len(names)-1)
 	}
-	command := strings.ReplaceAll(m.opts.ReviewCmd, "{range}", rng)
 
 	m.marks = map[string]bool{}
 	m.visual = false
 
-	note := ""
-	if gap {
-		note = " (selection not contiguous, layers in between included)"
-	}
 	root := m.repo.Root
 	switch where := reviewTarget(m.opts.ReviewIn); where {
 	case "herdr":

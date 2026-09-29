@@ -72,7 +72,7 @@ var helpSections = []helpSection{
 	{"review", [][2]string{
 		{"space", "mark branch"},
 		{"v", "visual range"},
-		{"R", "review selection in tuicr"},
+		{"R", "review selection in tuicr (one branch: its PR)"},
 	}},
 	{"other", [][2]string{
 		{"ctrl+r", "refresh now"},

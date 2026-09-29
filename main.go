@@ -40,6 +40,12 @@ func main() {
 		"review command; {range} becomes base..head",
 	)
 	flag.StringVar(
+		&opts.ReviewPRCmd,
+		"review-pr-cmd",
+		"tuicr pr {pr}",
+		"review command for a single branch with an open PR; {pr} becomes its number (empty: always review the range)",
+	)
+	flag.StringVar(
 		&opts.ReviewIn,
 		"review-in",
 		"auto",

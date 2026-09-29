@@ -13,7 +13,7 @@ import (
 )
 
 func testModel() Model {
-	m := New(&git.Repo{}, Options{ReviewCmd: "tuicr -r {range}"})
+	m := New(&git.Repo{}, Options{ReviewCmd: "tuicr -r {range}", ReviewPRCmd: "tuicr pr {pr}"})
 	m.width, m.height = 100, 40
 	m.loadingLocal = false
 	m.snap = &stack.Snapshot{
@@ -222,6 +222,33 @@ func TestReviewRangeSpansSelection(t *testing.T) {
 	sel = m.reviewSelection()
 	if _, gap, _ := m.reviewRange(sel); len(sel) != 2 || !gap {
 		t.Fatalf("selection = %v gap=%v, want two non-contiguous branches", sel, gap)
+	}
+}
+
+func TestReviewSingleBranchWithPR(t *testing.T) {
+	cases := []struct {
+		name string
+		keys []string
+		edit func(*Model)
+		want string
+	}{
+		{"open PR", nil, nil, "tuicr pr 2"},
+		{"draft PR", nil, func(m *Model) { m.prs["two"].IsDraft = true }, "tuicr pr 2"},
+		{"stack file only", nil, func(m *Model) { delete(m.prs, "two") }, "tuicr pr 2"},
+		{"closed PR", nil, func(m *Model) { m.prs["two"].State = "CLOSED" }, "tuicr -r h1..h2"},
+		{"no PR", []string{"K"}, nil, "tuicr -r h2..h3"},
+		{"several branches", []string{"v", "K"}, nil, "tuicr -r h1..h3"},
+		{"disabled", nil, func(m *Model) { m.opts.ReviewPRCmd = "" }, "tuicr -r h1..h2"},
+	}
+	for _, c := range cases {
+		m := press(testModel(), c.keys...)
+		if c.edit != nil {
+			c.edit(&m)
+		}
+		got, _, err := m.reviewCommand(m.reviewSelection())
+		if err != nil || got != c.want {
+			t.Errorf("%s: command = %q err=%v, want %q", c.name, got, err, c.want)
+		}
 	}
 }
 

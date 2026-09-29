@@ -10,12 +10,12 @@ It covers what `gh stack view` shows, and adds:
 - **Vim-style keys throughout.** Arrow keys also work.
 - **Catppuccin Mocha** colors, laid out like `gh stack view`.
 - **Copying** the hovered file path, commit SHA, branch name, or URL.
-- **Review:** select layers of the stack and open their combined commit range in [tuicr](https://github.com/agavra/tuicr), in a new herdr tab, a new tmux window, or inline.
+- **Review:** select layers of the stack and open their combined commit range in [tuicr](https://github.com/agavra/tuicr), or a single layer's PR, in a new herdr tab, a new tmux window, or inline.
 
 ## Usage
 
 ```sh
-go run . [-C dir] [-stack N] [-interval 30s] [-poll 2s] [-review-cmd 'tuicr -r {range}'] [-review-in auto]
+go run . [-C dir] [-stack N] [-interval 30s] [-poll 2s] [-review-cmd 'tuicr -r {range}'] [-review-pr-cmd 'tuicr pr {pr}'] [-review-in auto]
 ```
 
 The TUI shows the stack containing the checked out branch and follows you when you check out a branch in another stack. On trunk, or with a detached HEAD mid-rebase, it keeps showing the last stack. `[` and `]` switch between stacks and pin the choice until you next check out a branch.
@@ -53,7 +53,7 @@ Stack operations follow the aliases of the `gs` wrapper: `p` push, `s` sync, `P`
 
 ### Review
 
-`R` reviews the marked branches, or the visual range, or the hovered branch if nothing is selected. The stack is linear, so the selection becomes a single `base..head` range from the bottom selected layer to the top one. It then runs `--review-cmd` with `{range}` filled in. By default that opens a new herdr tab when running inside herdr (`HERDR_ENV=1`), a new tmux window inside tmux, and otherwise suspends the TUI while the review runs. Use `--review-in` to force one of these.
+`R` reviews the marked branches, or the visual range, or the hovered branch if nothing is selected. The stack is linear, so the selection becomes a single `base..head` range from the bottom selected layer to the top one. It then runs `--review-cmd` with `{range}` filled in. When the selection is a single branch with an open or draft PR, `--review-pr-cmd` runs instead with `{pr}` set to the PR number, so tuicr reviews the PR and comments can be submitted to it. Pass `--review-pr-cmd ''` to always review the range. By default that opens a new herdr tab when running inside herdr (`HERDR_ENV=1`), a new tmux window inside tmux, and otherwise suspends the TUI while the review runs. Use `--review-in` to force one of these.
 
 ## Development
 
