@@ -15,9 +15,6 @@ import (
 // outputPanelLines is the number of output lines shown under the stack.
 const outputPanelLines = 8
 
-// headerHeight is the header line plus the blank line under it.
-const headerHeight = 2
-
 func (m Model) View() tea.View {
 	v := tea.NewView(m.render())
 	v.AltScreen = true
@@ -141,22 +138,8 @@ func (m Model) headerLines() []string {
 			info += fmt.Sprintf(" (%d merged)", merged)
 		}
 		left += s.dim.Render("  on ") + s.normal.Render(snap.Trunk) + s.dim.Render(" · "+info)
-		switch {
-		case snap.Rebasing:
-			left += s.dim.Render(
-				" · ",
-			) + s.err.Render(
-				"rebase in progress",
-			) + s.dim.Render(
-				"  rc continue · ra abort",
-			)
-		case snap.CurrentBranch != "":
+		if snap.CurrentBranch != "" {
 			left += s.dim.Render(" · at ") + s.branchCurrent.Render(snap.CurrentBranch)
-		default:
-			left += s.dim.Render(" · ") + s.warn.Render("detached HEAD")
-		}
-		if snap.Dirty {
-			left += s.dim.Render(" · ") + s.warn.Render("uncommitted changes")
 		}
 		if m.pinned != "" {
 			left += s.dim.Render(" · pinned")
@@ -171,6 +154,25 @@ func (m Model) headerLines() []string {
 		right = s.dim.Render("↻ " + shortAgo(m.lastRemote))
 	}
 	lines := []string{spread(left, right, m.width)}
+	// Working tree state goes on its own line so the title fits a narrow
+	// split, and so it stands out when something needs attention.
+	if snap := m.snap; snap != nil && snap.Index >= 0 {
+		var notes []string
+		if snap.Rebasing {
+			notes = append(
+				notes,
+				s.err.Render("rebase in progress")+s.dim.Render("  rc continue · ra abort"),
+			)
+		} else if snap.CurrentBranch == "" {
+			notes = append(notes, s.warn.Render("detached HEAD"))
+		}
+		if snap.Dirty {
+			notes = append(notes, s.warn.Render("uncommitted changes"))
+		}
+		if len(notes) > 0 {
+			lines = append(lines, strings.Join(notes, s.dim.Render(" · ")))
+		}
+	}
 	if m.remoteErr != nil {
 		lines = append(lines, s.err.Render("GitHub: "+firstLine(m.remoteErr.Error())))
 	}
