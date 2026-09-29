@@ -36,7 +36,7 @@ Stack operations follow the aliases of the `gs` wrapper: `p` push, `s` sync, `P`
 | `ctrl+d`/`ctrl+u` | half page | `e` | open file in `$EDITOR` |
 | `.` | current branch | `c` | checkout branch |
 | `[` `]` | prev/next stack | `M` | merge PR and the PRs below it (asks first) |
-| mouse | wheel scrolls, click selects or toggles | `D` | mark draft PR ready for review (or every draft in the selection) |
+| mouse | wheel scrolls, click selects or toggles | `D` | mark draft PRs ready, or convert open PRs to draft (hovered or selection) |
 
 | Expand | | Stack | |
 |---|---|---|---|

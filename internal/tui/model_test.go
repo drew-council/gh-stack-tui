@@ -225,6 +225,26 @@ func TestReviewRangeSpansSelection(t *testing.T) {
 	}
 }
 
+func TestHeaderNotesGetTheirOwnLine(t *testing.T) {
+	m := testModel()
+	if n := len(m.headerLines()); n != 2 {
+		t.Fatalf("plain header should be the title and a blank line, got %d lines", n)
+	}
+	m.snap.Rebasing, m.snap.Dirty = true, true
+	lines := m.headerLines()
+	if len(lines) != 3 {
+		t.Fatalf("header with notes should add one line, got %d", len(lines))
+	}
+	if got := ansi.Strip(
+		lines[1],
+	); got != "rebase in progress  rc continue · ra abort · uncommitted changes" {
+		t.Fatalf("notes line = %q", got)
+	}
+	if strings.Contains(ansi.Strip(lines[0]), "rebase") {
+		t.Fatal("title line should not carry the rebase note")
+	}
+}
+
 func TestOpsRequireCheckedOutStack(t *testing.T) {
 	m := testModel()
 	m.snap.CurrentBranch = "main"
@@ -234,10 +254,51 @@ func TestOpsRequireCheckedOutStack(t *testing.T) {
 	}
 }
 
-func TestMarkReadyNeedsDraft(t *testing.T) {
-	m := press(testModel(), "D")
-	if m.op != nil || !m.flashErr {
-		t.Fatal("D should refuse on a PR that is not a draft")
+func TestDraftToggleFlipsBothWays(t *testing.T) {
+	cases := []struct {
+		nums       []string
+		undo       bool
+		title, cmd string
+	}{
+		{[]string{"2"}, false, "ready #2", "gh pr ready 2"},
+		{[]string{"2"}, true, "draft #2", "gh pr ready 2 --undo"},
+		{
+			[]string{"2", "3"},
+			false, "ready 2 PRs",
+			`sh -c for n; do gh pr ready "$n" || exit; done sh 2 3`,
+		},
+		{
+			[]string{"2", "3"},
+			true, "draft 2 PRs",
+			`sh -c for n; do gh pr ready "$n" --undo || exit; done sh 2 3`,
+		},
+	}
+	for _, c := range cases {
+		title, name, args := draftToggle(c.nums, c.undo)
+		if cmd := name + " " + strings.Join(args, " "); title != c.title || cmd != c.cmd {
+			t.Errorf(
+				"draftToggle(%v, %v) = %q %q, want %q %q",
+				c.nums,
+				c.undo,
+				title,
+				cmd,
+				c.title,
+				c.cmd,
+			)
+		}
+	}
+}
+
+func TestDraftToggleRefusals(t *testing.T) {
+	m := press(testModel(), "K", "D")
+	if m.op != nil || m.flash != "no pull request for three" {
+		t.Fatalf("branch without a PR should refuse, flash %q", m.flash)
+	}
+	m = testModel()
+	m.prs["two"].State = "CLOSED"
+	m = press(m, "D")
+	if m.op != nil || m.flash != "#2 is closed" {
+		t.Fatalf("closed PR should refuse, flash %q", m.flash)
 	}
 }
 
@@ -270,7 +331,8 @@ func TestRenderLayout(t *testing.T) {
 		"│",
 		"└ main",
 	}
-	body := lines[headerHeight : headerHeight+len(want)]
+	top := len(m.headerLines())
+	body := lines[top : top+len(want)]
 	for i := range want {
 		if body[i] != want[i] {
 			t.Fatalf("line %d = %q, want %q\n%s", i, body[i], want[i], strings.Join(body, "\n"))

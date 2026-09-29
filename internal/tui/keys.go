@@ -55,7 +55,7 @@ var helpSections = []helpSection{
 		{"e", "edit file in $EDITOR"},
 		{"c", "checkout branch"},
 		{"M", "merge PR (and below)"},
-		{"D", "mark draft PR(s) ready for review"},
+		{"D", "toggle PR(s) draft / ready"},
 	}},
 	{"stack", [][2]string{
 		{"p", "push"},
@@ -186,7 +186,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "M":
 		cmd = m.confirmMerge()
 	case "D":
-		cmd = m.markReady()
+		cmd = m.toggleDraft()
 
 	// stack operations
 	case "p":
@@ -592,30 +592,75 @@ func (m *Model) confirmMerge() tea.Cmd {
 	return nil
 }
 
-// markReady marks the draft PRs of the review selection (marks, visual
-// range, or the hovered branch) ready for review.
-func (m *Model) markReady() tea.Cmd {
+// toggleDraft flips the draft state of the open PRs in the review selection
+// (marks, visual range, or the hovered branch). Drafts are marked ready for
+// review; when the selection has none, its PRs are converted back to drafts.
+// It needs live PR data, since the stack file does not record draft state.
+func (m *Model) toggleDraft() tea.Cmd {
 	if m.snap == nil || len(m.snap.Branches) == 0 {
 		return nil
 	}
-	var nums []string
-	for _, i := range m.reviewSelection() {
-		if pr := m.prFor(i); pr != nil && pr.IsDraft && pr.State == "OPEN" {
-			nums = append(nums, fmt.Sprint(pr.Number))
+	sel := m.reviewSelection()
+	var drafts, ready []string
+	for _, i := range sel {
+		if pr := m.prFor(i); pr != nil && pr.State == "OPEN" && !pr.Merged {
+			if pr.IsDraft {
+				drafts = append(drafts, fmt.Sprint(pr.Number))
+			} else {
+				ready = append(ready, fmt.Sprint(pr.Number))
+			}
 		}
 	}
+	nums, undo := drafts, false
 	if len(nums) == 0 {
-		return m.setFlash("no open draft PR selected", true)
+		nums, undo = ready, true
+	}
+	if len(nums) == 0 {
+		if len(sel) == 1 {
+			return m.draftRefusal(sel[0])
+		}
+		return m.setFlash("no open PR selected", true)
 	}
 	m.marks = map[string]bool{}
 	m.visual = false
+	title, name, args := draftToggle(nums, undo)
+	cmd := m.runOp(title, name, args...)
+	if m.op != nil {
+		m.op.quiet = true
+	}
+	return cmd
+}
+
+// draftRefusal explains why branch i's PR cannot change draft state.
+func (m *Model) draftRefusal(i int) tea.Cmd {
+	pr := m.prFor(i)
+	if pr == nil {
+		if m.prNumber(i) == 0 {
+			return m.setFlash("no pull request for "+m.snap.Branches[i].Name, true)
+		}
+		return m.setFlash("PR state not loaded yet", true)
+	}
+	return m.setFlash(fmt.Sprintf("#%d is %s", pr.Number, strings.ToLower(pr.State)), true)
+}
+
+// draftToggle returns the title and command that mark the PRs nums ready for
+// review, or with undo convert them to drafts.
+func draftToggle(nums []string, undo bool) (string, string, []string) {
+	verb, flag := "ready", ""
+	if undo {
+		verb, flag = "draft", " --undo"
+	}
 	if len(nums) == 1 {
-		return m.runOp("ready #"+nums[0], "gh", "pr", "ready", nums[0])
+		args := []string{"pr", "ready", nums[0]}
+		if undo {
+			args = append(args, "--undo")
+		}
+		return verb + " #" + nums[0], "gh", args
 	}
 	// gh pr ready takes one PR at a time.
-	title := fmt.Sprintf("ready %d PRs", len(nums))
-	script := `for n; do gh pr ready "$n" || exit; done`
-	return m.runOp(title, "sh", append([]string{"-c", script, "sh"}, nums...)...)
+	title := fmt.Sprintf("%s %d PRs", verb, len(nums))
+	script := `for n; do gh pr ready "$n"` + flag + ` || exit; done`
+	return title, "sh", append([]string{"-c", script, "sh"}, nums...)
 }
 
 func (m *Model) confirmUnstack() tea.Cmd {
