@@ -81,6 +81,7 @@ type Model struct {
 	confirm    *confirmState
 
 	op          *opState
+	queue       []pendingOp
 	output      []string
 	outputTitle string
 	outputState opStatus
@@ -184,13 +185,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.finishOp(msg)
 
 	case execDoneMsg:
-		var flash tea.Cmd
-		if msg.err != nil {
-			flash = m.setFlash(msg.what+": "+msg.err.Error(), true)
-		} else if msg.what != "" {
-			flash = m.setFlash(msg.what+" finished", false)
-		}
-		return m, tea.Batch(flash, m.requestLocal(), m.requestRemote())
+		return m.finishExec(msg)
 
 	case flashMsg:
 		flash := m.setFlash(msg.text, msg.err)

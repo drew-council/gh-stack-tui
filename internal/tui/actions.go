@@ -54,14 +54,61 @@ type (
 // maxOutput bounds the output panel's scrollback.
 const maxOutput = 500
 
+// pendingOp is a command waiting for the running one to finish.
+type pendingOp struct {
+	title string
+	name  string
+	args  []string
+	quiet bool
+	// interactive commands suspend the TUI and run in the terminal; what
+	// names them in the flash when they finish, if set.
+	interactive bool
+	what        string
+}
+
 // runOp runs a command in the background, streaming its combined output into
 // the output panel. Stdin is closed, so gh stack takes its non-interactive
 // paths instead of prompting.
 func (m *Model) runOp(title string, name string, args ...string) tea.Cmd {
+	return m.enqueue(pendingOp{title: title, name: name, args: args})
+}
+
+// runQuietOp is runOp, but the output panel hides again on success.
+func (m *Model) runQuietOp(title string, name string, args ...string) tea.Cmd {
+	return m.enqueue(pendingOp{title: title, name: name, args: args, quiet: true})
+}
+
+// enqueue starts p, or queues it behind the running command. The queue runs in
+// order and is dropped when a command fails.
+func (m *Model) enqueue(p pendingOp) tea.Cmd {
 	if m.op != nil {
-		return m.setFlash("busy: "+m.op.title+" is still running", true)
+		m.queue = append(m.queue, p)
+		return m.setFlash("queued "+p.title, false)
 	}
-	m.op = &opState{title: title, started: time.Now()}
+	return m.start(p)
+}
+
+// next starts the first queued command, if any.
+func (m *Model) next() tea.Cmd {
+	if len(m.queue) == 0 {
+		return nil
+	}
+	p := m.queue[0]
+	m.queue = m.queue[1:]
+	return m.start(p)
+}
+
+func (m *Model) start(p pendingOp) tea.Cmd {
+	m.op = &opState{title: p.title, started: time.Now(), quiet: p.quiet}
+	if p.interactive {
+		cmd := exec.Command(p.name, p.args...)
+		cmd.Dir = m.repo.Root
+		return tea.ExecProcess(
+			cmd,
+			func(err error) tea.Msg { return execDoneMsg{what: p.what, err: err} },
+		)
+	}
+	title, name, args := p.title, p.name, p.args
 	m.output = []string{"$ " + name + " " + strings.Join(args, " ")}
 	m.outputTitle = title
 	m.outputState = opRunning
@@ -144,8 +191,9 @@ var exitHints = map[int]string{
 func (m Model) finishOp(msg opDoneMsg) (tea.Model, tea.Cmd) {
 	quiet := m.op != nil && m.op.quiet
 	m.op = nil
-	var flash tea.Cmd
+	var flash, next tea.Cmd
 	if msg.err != nil {
+		m.queue = nil
 		m.outputState = opFailed
 		text := msg.title + " failed"
 		if hint, ok := exitHints[msg.exitCode]; ok {
@@ -161,8 +209,24 @@ func (m Model) finishOp(msg opDoneMsg) (tea.Model, tea.Cmd) {
 		if quiet {
 			m.showOutput = false
 		}
+		next = m.next()
 	}
-	return m, tea.Batch(flash, m.requestLocal(), m.requestRemote())
+	return m, tea.Batch(flash, next, m.requestLocal(), m.requestRemote())
+}
+
+func (m Model) finishExec(msg execDoneMsg) (tea.Model, tea.Cmd) {
+	m.op = nil
+	var flash, next tea.Cmd
+	if msg.err != nil {
+		m.queue = nil
+		flash = m.setFlash(msg.what+": "+msg.err.Error(), true)
+	} else {
+		if msg.what != "" {
+			flash = m.setFlash(msg.what+" finished", false)
+		}
+		next = m.next()
+	}
+	return m, tea.Batch(flash, next, m.requestLocal(), m.requestRemote())
 }
 
 // lastLine picks the line that best explains a failure: gh stack prefixes
@@ -186,17 +250,12 @@ func lastLine(lines []string) string {
 }
 
 // runInteractive suspends the TUI to run an interactive command in the
-// terminal, then resumes and refreshes.
-func (m *Model) runInteractive(what string, name string, args ...string) tea.Cmd {
-	if m.op != nil {
-		return m.setFlash("busy: "+m.op.title+" is still running", true)
-	}
-	cmd := exec.Command(name, args...)
-	cmd.Dir = m.repo.Root
-	return tea.ExecProcess(
-		cmd,
-		func(err error) tea.Msg { return execDoneMsg{what: what, err: err} },
-	)
+// terminal, then resumes and refreshes. title names it while queued; what,
+// when set, names it in the flash once it finishes.
+func (m *Model) runInteractive(title, what string, name string, args ...string) tea.Cmd {
+	return m.enqueue(pendingOp{
+		title: title, name: name, args: args, interactive: true, what: what,
+	})
 }
 
 // --- clipboard and browser ---
@@ -390,7 +449,7 @@ func (m *Model) startReview() tea.Cmd {
 			return flashMsg{text: "opened " + label + " in a new tmux window" + note}
 		}
 	default:
-		return m.runInteractive("", "sh", "-c", command)
+		return m.runInteractive(label, "", "sh", "-c", command)
 	}
 }
 

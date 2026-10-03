@@ -583,6 +583,9 @@ func (m Model) outputLines() []string {
 			elapsed = fmt.Sprintf(" %ds", int(time.Since(m.op.started).Seconds()))
 		}
 		status = m.spinner.View() + s.warn.Render(" running"+elapsed)
+		if n := len(m.queue); n > 0 {
+			status += s.dim.Render(fmt.Sprintf(" · %d queued", n))
+		}
 	case opSucceeded:
 		status = s.ok.Render("✓ done")
 	case opFailed:

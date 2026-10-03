@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -278,6 +279,40 @@ func TestOpsRequireCheckedOutStack(t *testing.T) {
 	m = press(m, "p")
 	if m.op != nil || !m.flashErr {
 		t.Fatal("push should refuse while the stack is not checked out")
+	}
+}
+
+func TestOpsQueueBehindRunningOp(t *testing.T) {
+	m := testModel()
+	m.op = &opState{title: "sync"}
+	m = press(m, "p", "r", "r")
+	if len(m.queue) != 2 || m.queue[0].title != "push" || m.queue[1].title != "rebase" {
+		t.Fatalf("queue = %+v, want push then rebase", m.queue)
+	}
+	if m.flashErr || m.flash != "queued rebase" {
+		t.Fatalf("flash = %q, want queued rebase", m.flash)
+	}
+	if got := ansi.Strip(m.outputLines()[0]); !strings.Contains(got, "2 queued") {
+		t.Fatalf("output title = %q, want the queue length", got)
+	}
+
+	// A failure drops the rest of the queue.
+	next, _ := m.finishOp(opDoneMsg{title: "sync", err: errors.New("exit status 1"), exitCode: 1})
+	m = next.(Model)
+	if m.op != nil || len(m.queue) != 0 {
+		t.Fatalf("failed op should clear the queue, op %v queue %+v", m.op, m.queue)
+	}
+
+	// Success starts the next queued op with its command shown.
+	m.op = &opState{title: "sync"}
+	m.queue = []pendingOp{{title: "true", name: "true"}, {title: "push", name: "gh"}}
+	next, _ = m.finishOp(opDoneMsg{title: "sync"})
+	m = next.(Model)
+	if m.op == nil || m.op.title != "true" || m.outputState != opRunning {
+		t.Fatalf("next op should start, op %+v", m.op)
+	}
+	if len(m.output) != 1 || m.output[0] != "$ true " || len(m.queue) != 1 {
+		t.Fatalf("output %q queue %+v", m.output, m.queue)
 	}
 }
 

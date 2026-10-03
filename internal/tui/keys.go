@@ -205,7 +205,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	case "m":
 		if m.requireCurrentStack() {
-			cmd = m.runInteractive("modify", "gh", "stack", "modify")
+			cmd = m.runInteractive("modify", "modify", "gh", "stack", "modify")
 		} else {
 			cmd = m.notCurrentFlash()
 		}
@@ -531,7 +531,7 @@ func (m *Model) editHovered() tea.Cmd {
 	if editor == "" {
 		editor = "vi"
 	}
-	return m.runInteractive("", "sh", "-c", editor+` "$1"`, "sh", r.file.Path)
+	return m.runInteractive("edit "+r.file.Path, "", "sh", "-c", editor+` "$1"`, "sh", r.file.Path)
 }
 
 func (m *Model) checkoutHovered() tea.Cmd {
@@ -543,11 +543,7 @@ func (m *Model) checkoutHovered() tea.Cmd {
 	if b.IsCurrent {
 		return m.setFlash(b.Name+" is already checked out", false)
 	}
-	cmd := m.runOp("checkout "+b.Name, "git", "checkout", b.Name)
-	if m.op != nil {
-		m.op.quiet = true
-	}
-	return cmd
+	return m.runQuietOp("checkout "+b.Name, "git", "checkout", b.Name)
 }
 
 func (m *Model) confirmMerge() tea.Cmd {
@@ -624,11 +620,7 @@ func (m *Model) toggleDraft() tea.Cmd {
 	m.marks = map[string]bool{}
 	m.visual = false
 	title, name, args := draftToggle(nums, undo)
-	cmd := m.runOp(title, name, args...)
-	if m.op != nil {
-		m.op.quiet = true
-	}
-	return cmd
+	return m.runQuietOp(title, name, args...)
 }
 
 // draftRefusal explains why branch i's PR cannot change draft state.
