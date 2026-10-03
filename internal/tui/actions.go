@@ -2,6 +2,7 @@ package tui
 
 import (
 	"bufio"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -26,6 +28,7 @@ const (
 	opRunning opStatus = iota
 	opSucceeded
 	opFailed
+	opCancelled
 )
 
 type opState struct {
@@ -33,7 +36,14 @@ type opState struct {
 	started time.Time
 	// quiet ops hide the output panel again when they succeed.
 	quiet bool
+	// cancel interrupts a background op; nil for interactive ones.
+	cancel    context.CancelFunc
+	cancelled bool
 }
+
+// cancelWait is how long a cancelled op gets to exit after the interrupt
+// before it is killed.
+const cancelWait = 5 * time.Second
 
 type (
 	opLineMsg struct {
@@ -64,6 +74,9 @@ type pendingOp struct {
 	// names them in the flash when they finish, if set.
 	interactive bool
 	what        string
+	// stack, when set, holds the branches of the stack shown when the op was
+	// queued; it only starts if one of them is still checked out.
+	stack []string
 }
 
 // runOp runs a command in the background, streaming its combined output into
@@ -95,7 +108,23 @@ func (m *Model) next() tea.Cmd {
 	}
 	p := m.queue[0]
 	m.queue = m.queue[1:]
+	if p.stack != nil && !slices.Contains(p.stack, m.repo.CurrentBranch()) {
+		m.queue = nil
+		return m.notCurrentFlash()
+	}
 	return m.start(p)
+}
+
+// cancelOp interrupts the running op and drops the queue. It reports false
+// when there is nothing to cancel.
+func (m *Model) cancelOp() bool {
+	if m.op == nil || m.op.cancel == nil || m.op.cancelled {
+		return false
+	}
+	m.queue = nil
+	m.op.cancelled = true
+	m.op.cancel()
+	return true
 }
 
 func (m *Model) start(p pendingOp) tea.Cmd {
@@ -114,18 +143,24 @@ func (m *Model) start(p pendingOp) tea.Cmd {
 	m.outputState = opRunning
 	m.showOutput = true
 
+	ctx, cancel := context.WithCancel(context.Background())
+	m.op.cancel = cancel
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Dir = m.repo.Root
+	cmd.Env = append(
+		os.Environ(),
+		"GH_PROMPT_DISABLED=1",
+		"NO_COLOR=1",
+		"GIT_TERMINAL_PROMPT=0",
+	)
+	detach(cmd)
+	cmd.Cancel = func() error { return interrupt(cmd) }
+	cmd.WaitDelay = cancelWait
+
 	ch := make(chan tea.Msg, 64)
-	root := m.repo.Root
 	go func() {
 		defer close(ch)
-		cmd := exec.Command(name, args...)
-		cmd.Dir = root
-		cmd.Env = append(
-			os.Environ(),
-			"GH_PROMPT_DISABLED=1",
-			"NO_COLOR=1",
-			"GIT_TERMINAL_PROMPT=0",
-		)
+		defer cancel()
 		pr, pw := io.Pipe()
 		cmd.Stdout = pw
 		cmd.Stderr = pw
@@ -190,9 +225,14 @@ var exitHints = map[int]string{
 
 func (m Model) finishOp(msg opDoneMsg) (tea.Model, tea.Cmd) {
 	quiet := m.op != nil && m.op.quiet
+	cancelled := m.op != nil && m.op.cancelled
 	m.op = nil
 	var flash, next tea.Cmd
-	if msg.err != nil {
+	switch {
+	case cancelled:
+		m.outputState = opCancelled
+		flash = m.setFlash(msg.title+" cancelled", false)
+	case msg.err != nil:
 		m.queue = nil
 		m.outputState = opFailed
 		text := msg.title + " failed"
@@ -203,7 +243,7 @@ func (m Model) finishOp(msg opDoneMsg) (tea.Model, tea.Cmd) {
 		}
 		m.appendOutput(fmt.Sprintf("[exit %d]", msg.exitCode))
 		flash = m.setFlash(text, true)
-	} else {
+	default:
 		m.outputState = opSucceeded
 		flash = m.setFlash(msg.title+" done", false)
 		if quiet {

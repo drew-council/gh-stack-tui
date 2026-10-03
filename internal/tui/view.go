@@ -590,6 +590,8 @@ func (m Model) outputLines() []string {
 		status = s.ok.Render("✓ done")
 	case opFailed:
 		status = s.err.Render("✗ failed")
+	case opCancelled:
+		status = s.warn.Render("✗ cancelled")
 	}
 	title := s.rule.Render("── ") + s.title.Render(m.outputTitle) + " " + status + " "
 	hide := s.key.Render("!") + s.keyDesc.Render(" hide")

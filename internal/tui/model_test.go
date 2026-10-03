@@ -316,6 +316,32 @@ func TestOpsQueueBehindRunningOp(t *testing.T) {
 	}
 }
 
+func TestQueuedStackOpsCheckCheckoutWhenStarting(t *testing.T) {
+	m := testModel()
+	m.snap.CurrentBranch = "main"
+	m.op = &opState{title: "checkout"}
+	m = press(m, "p")
+	if len(m.queue) != 1 || m.flashErr {
+		t.Fatalf("push should queue behind a running op, flash %q", m.flash)
+	}
+
+	// Nothing from the stack got checked out, so push refuses to start.
+	m.queue[0].stack = []string{"not-a-branch"}
+	m.queue = append(m.queue, pendingOp{title: "sync"})
+	next, _ := m.finishOp(opDoneMsg{title: "checkout"})
+	m = next.(Model)
+	if m.op != nil || len(m.queue) != 0 || !m.flashErr {
+		t.Fatalf("push should refuse and drop the queue, op %+v flash %q", m.op, m.flash)
+	}
+
+	m.op = &opState{title: "checkout"}
+	m.queue = []pendingOp{{title: "true", name: "true", stack: []string{m.repo.CurrentBranch()}}}
+	next, _ = m.finishOp(opDoneMsg{title: "checkout"})
+	if m = next.(Model); m.op == nil || m.op.title != "true" {
+		t.Fatalf("op on the checked out stack should start, op %+v", m.op)
+	}
+}
+
 func TestDraftToggleFlipsBothWays(t *testing.T) {
 	cases := []struct {
 		nums       []string

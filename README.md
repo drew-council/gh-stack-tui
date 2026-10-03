@@ -6,7 +6,7 @@ It covers what `gh stack view` shows, and adds:
 
 - **Live updates.** Local branches are polled every couple of seconds, and PR and CI state is refetched from GitHub every 30 seconds. Loading runs in the background and never blocks input, so you can leave it open as a view of your stack.
 - **CI checks per PR**, grouped by workflow. Each workflow expands to its jobs, and re-runs are deduplicated.
-- **Stack operations without leaving the TUI:** push, sync, rebase, submit, merge, add, and unstack. Output streams into a panel under the stack. `gh stack modify` runs in the foreground and the TUI comes back when it exits.
+- **Stack operations without leaving the TUI:** push, sync, rebase, submit, merge, add, and unstack. Output streams into a panel under the stack. Commands started while one is running queue up and run in order; a failure or `ctrl+c` drops the rest. `gh stack modify` runs in the foreground and the TUI comes back when it exits.
 - **Vim-style keys throughout.** Arrow keys also work.
 - **Catppuccin Mocha** colors, laid out like `gh stack view`.
 - **Copying** the hovered file path, commit SHA, branch name, or URL.
@@ -50,6 +50,7 @@ Stack operations follow the aliases of the `gs` wrapper: `p` push, `s` sync, `P`
 | `v` | visual range | `:` | run any `gh stack …` command |
 | `R` | review selection | `ctrl+r` | refresh now |
 | | | `!` / `?` / `q` | output panel / help / quit |
+| | | `ctrl+c` | cancel the running command and the queue, else quit |
 
 ### Review
 

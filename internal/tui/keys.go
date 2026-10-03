@@ -78,6 +78,7 @@ var helpSections = []helpSection{
 		{"ctrl+r", "refresh now"},
 		{"!", "toggle output"},
 		{"esc", "clear / close"},
+		{"ctrl+c", "cancel running op and queue / quit"},
 		{"?", "help"},
 		{"q", "quit"},
 	}},
@@ -86,6 +87,9 @@ var helpSections = []helpSection{
 func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 	if key == "ctrl+c" {
+		if m.cancelOp() {
+			return m, m.setFlash("cancelling "+m.op.title+"…", false)
+		}
 		return m, tea.Quit
 	}
 
@@ -198,17 +202,16 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "S":
 		cmd = m.stackOp("submit", "submit", "--auto")
 	case "a":
-		if m.requireCurrentStack() {
+		if m.stackReady() {
 			cmd = m.openPrompt(promptAdd, "")
 		} else {
 			cmd = m.notCurrentFlash()
 		}
 	case "m":
-		if m.requireCurrentStack() {
-			cmd = m.runInteractive("modify", "modify", "gh", "stack", "modify")
-		} else {
-			cmd = m.notCurrentFlash()
-		}
+		cmd = m.onStack(pendingOp{
+			title: "modify", what: "modify", name: "gh", args: []string{"stack", "modify"},
+			interactive: true,
+		})
 	case "u":
 		cmd = m.confirmUnstack()
 	case ":":
@@ -258,6 +261,13 @@ func (m *Model) requireCurrentStack() bool {
 	return m.snap != nil && m.snap.HasBranch(m.snap.CurrentBranch)
 }
 
+// stackReady reports whether a stack op may be queued: the shown stack is
+// checked out, or an op is running that may check it out first. Queued ops
+// check again when they start.
+func (m *Model) stackReady() bool {
+	return m.op != nil || m.requireCurrentStack()
+}
+
 func (m *Model) notCurrentFlash() tea.Cmd {
 	return m.setFlash("this stack is not checked out: press c on one of its branches first", true)
 }
@@ -265,10 +275,24 @@ func (m *Model) notCurrentFlash() tea.Cmd {
 func (m *Model) stackOp(title string, args ...string) tea.Cmd {
 	// Continue and abort must work mid-rebase, while HEAD is detached.
 	resuming := len(args) > 1 && (args[1] == "--continue" || args[1] == "--abort")
-	if !resuming && !m.requireCurrentStack() {
+	p := pendingOp{title: title, name: "gh", args: append([]string{"stack"}, args...)}
+	if resuming {
+		return m.enqueue(p)
+	}
+	return m.onStack(p)
+}
+
+// onStack queues p to run on the shown stack, which must be checked out when
+// p starts.
+func (m *Model) onStack(p pendingOp) tea.Cmd {
+	if m.snap == nil || !m.stackReady() {
 		return m.notCurrentFlash()
 	}
-	return m.runOp(title, "gh", append([]string{"stack"}, args...)...)
+	p.stack = []string{}
+	for _, b := range m.snap.Branches {
+		p.stack = append(p.stack, b.Name)
+	}
+	return m.enqueue(p)
 }
 
 func (m *Model) cycleStack(key string) tea.Cmd {
@@ -656,7 +680,7 @@ func draftToggle(nums []string, undo bool) (string, string, []string) {
 }
 
 func (m *Model) confirmUnstack() tea.Cmd {
-	if !m.requireCurrentStack() {
+	if !m.stackReady() {
 		return m.notCurrentFlash()
 	}
 	m.mode = modeConfirm
