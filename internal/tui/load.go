@@ -2,11 +2,8 @@ package tui
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/url"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 
@@ -28,9 +25,9 @@ type (
 	}
 
 	remoteLoadedMsg struct {
-		repo github.Repo
-		prs  map[string]*github.PR
-		err  error
+		client *github.Client
+		prs    map[string]*github.PR
+		err    error
 	}
 
 	reviewersLoadedMsg struct {
@@ -191,9 +188,8 @@ func (m *Model) requestRemote() tea.Cmd {
 		return nil
 	}
 	m.loadingRemote = true
-	repo := m.ghRepo
+	client := m.gh
 	repository := m.snap.Repository
-	root := m.repo.Root
 	var lookups []github.Lookup
 	for _, b := range m.snap.Branches {
 		l := github.Lookup{Branch: b.Name}
@@ -203,46 +199,33 @@ func (m *Model) requestRemote() tea.Cmd {
 		lookups = append(lookups, l)
 	}
 	return func() tea.Msg {
-		if repo.Owner == "" {
-			var err error
-			if repo, err = resolveRepo(root, repository); err != nil {
+		if client == nil {
+			repo, err := resolveRepo(repository)
+			if err != nil {
+				return remoteLoadedMsg{err: err}
+			}
+			if client, err = github.NewClient(repo); err != nil {
 				return remoteLoadedMsg{err: err}
 			}
 		}
-		prs, err := github.FetchPRs(context.Background(), repo, lookups)
-		return remoteLoadedMsg{repo: repo, prs: prs, err: err}
+		prs, err := client.FetchPRs(context.Background(), lookups)
+		return remoteLoadedMsg{client: client, prs: prs, err: err}
 	}
 }
 
 // resolveRepo reads the repository from the stack file's "host:owner/name",
-// falling back to asking gh about the current directory.
-func resolveRepo(root, repository string) (github.Repo, error) {
+// falling back to the git remotes of the working directory, as gh does.
+func resolveRepo(repository string) (github.Repo, error) {
 	if host, rest, ok := strings.Cut(repository, ":"); ok {
 		if owner, name, ok := strings.Cut(rest, "/"); ok && owner != "" && name != "" {
 			return github.Repo{Host: host, Owner: owner, Name: name}, nil
 		}
 	}
-	cmd := exec.Command("gh", "repo", "view", "--json", "owner,name,url")
-	cmd.Dir = root
-	out, err := cmd.Output()
+	repo, err := github.CurrentRepo()
 	if err != nil {
 		return github.Repo{}, fmt.Errorf("resolving GitHub repository: %w", err)
 	}
-	var v struct {
-		Owner struct {
-			Login string `json:"login"`
-		} `json:"owner"`
-		Name string `json:"name"`
-		URL  string `json:"url"`
-	}
-	if err := json.Unmarshal(out, &v); err != nil {
-		return github.Repo{}, err
-	}
-	host := "github.com"
-	if u, err := url.Parse(v.URL); err == nil && u.Host != "" {
-		host = u.Host
-	}
-	return github.Repo{Host: host, Owner: v.Owner.Login, Name: v.Name}, nil
+	return repo, nil
 }
 
 func (m Model) applyRemote(msg remoteLoadedMsg) (tea.Model, tea.Cmd) {
@@ -252,11 +235,13 @@ func (m Model) applyRemote(msg remoteLoadedMsg) (tea.Model, tea.Cmd) {
 		m.reloadRemote = false
 		cmd = m.requestRemote()
 	}
+	if msg.client != nil {
+		m.gh = msg.client
+	}
 	m.remoteErr = msg.err
 	if msg.err != nil {
 		return m, cmd
 	}
-	m.ghRepo = msg.repo
 	m.prs = msg.prs
 	m.lastRemote = time.Now()
 	fallback := ""
@@ -273,13 +258,13 @@ func (m Model) applyRemote(msg remoteLoadedMsg) (tea.Model, tea.Cmd) {
 // once the repository is known. The list does not change while the TUI
 // runs, so it is fetched once and retried only after a failure.
 func (m *Model) requestReviewers() tea.Cmd {
-	if m.reviewersLoaded || m.loadingReviewers || m.ghRepo.Owner == "" {
+	if m.reviewersLoaded || m.loadingReviewers || m.gh == nil {
 		return nil
 	}
 	m.loadingReviewers = true
-	repo := m.ghRepo
+	client := m.gh
 	return func() tea.Msg {
-		reviewers, err := github.FetchReviewers(context.Background(), repo)
+		reviewers, err := client.FetchReviewers(context.Background())
 		return reviewersLoadedMsg{reviewers: reviewers, err: err}
 	}
 }

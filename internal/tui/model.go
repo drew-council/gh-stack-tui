@@ -60,7 +60,8 @@ type Model struct {
 	loadingRemote bool
 	reloadRemote  bool
 	fingerprint   string
-	ghRepo        github.Repo
+	// gh talks to the stack's repository on GitHub, once it is resolved.
+	gh *github.Client
 
 	// reviewers are the people who can review PRs in the repository, loaded
 	// once in the background after the first remote load.
@@ -198,6 +199,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case reviewersLoadedMsg:
 		return m.applyReviewers(msg), nil
+
+	case reviewersRequestedMsg:
+		if msg.err != nil {
+			return m, m.setFlash(msg.err.Error()+": nothing marked ready", true)
+		}
+		return m, m.enqueue(msg.ready)
 
 	case opLineMsg:
 		m.appendOutput(msg.line)

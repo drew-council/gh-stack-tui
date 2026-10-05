@@ -1,20 +1,80 @@
 package tui
 
 import (
+	"io"
+	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/cli/go-gh/v2/pkg/api"
 
 	"github.com/drew-council/gh-stack-tui/internal/github"
 )
 
-// draftModel is testModel with two's PR a draft that only a team is asked to
-// review, and the repository's reviewers loaded.
-func draftModel() Model {
+// fakeGitHub answers every request with status, and records the requests.
+type fakeGitHub struct {
+	status   int
+	requests []string
+}
+
+func (f *fakeGitHub) RoundTrip(req *http.Request) (*http.Response, error) {
+	body, _ := io.ReadAll(req.Body)
+	f.requests = append(f.requests, req.Method+" "+req.URL.Path+" "+string(body))
+	return &http.Response{
+		StatusCode: f.status,
+		Header:     http.Header{"Content-Type": {"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(`{"message": "Validation Failed"}`)),
+		Request:    req,
+	}, nil
+}
+
+// submit presses enter in the picker and feeds back the result of
+// requesting reviewers. Batched commands run concurrently, since flashes
+// batch a timer that would otherwise hold the test up.
+func submit(t *testing.T, m Model) Model {
+	t.Helper()
+	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	m = next.(Model)
+	results := make(chan tea.Msg, 8)
+	msg := cmd()
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		for _, c := range batch {
+			if c != nil {
+				go func() { results <- c() }()
+			}
+		}
+	} else {
+		results <- msg
+	}
+	for {
+		select {
+		case msg := <-results:
+			if msg, ok := msg.(reviewersRequestedMsg); ok {
+				next, _ = m.Update(msg)
+				return next.(Model)
+			}
+		case <-time.After(2 * time.Second):
+			return m
+		}
+	}
+}
+
+func draftModel(t *testing.T, fake *fakeGitHub) Model {
+	t.Helper()
 	m := testModel()
-	m.ghRepo = github.Repo{Host: "github.com", Owner: "o", Name: "r"}
+	client, err := github.NewClientWith(
+		github.Repo{Host: "github.com", Owner: "o", Name: "r"},
+		api.ClientOptions{
+			Host: "github.com", AuthToken: "token", Transport: fake, LogIgnoreEnv: true,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.gh = client
 	pr := m.prs["two"]
 	pr.IsDraft = true
 	pr.RequestedTeams = []string{"go-readability"}
@@ -87,7 +147,8 @@ func TestFuzzyMatch(t *testing.T) {
 }
 
 func TestReadyWithOnlyTeamsOpensReviewerPicker(t *testing.T) {
-	m := press(draftModel(), "D")
+	fake := &fakeGitHub{status: 201}
+	m := press(draftModel(t, fake), "D")
 	if m.mode != modeReviewers || m.picker == nil {
 		t.Fatalf("D on a draft with only team reviewers should open the picker, flash %q", m.flash)
 	}
@@ -108,33 +169,44 @@ func TestReadyWithOnlyTeamsOpensReviewerPicker(t *testing.T) {
 		t.Fatal("esc should cancel without marking ready")
 	}
 
-	// Pick two, then enter requests both and marks the PR ready.
+	// Pick two, then enter requests both, then marks the PR ready.
 	m = press(m, "D")
 	m = keys(m, keyDown, keyTab, keyTab)
-	m = press(m, "enter")
+	m = submit(t, m)
+	wantReq := `POST /repos/o/r/pulls/2/requested_reviewers {"reviewers":["mbhatg","zachsheer"]}`
+	if len(fake.requests) != 1 || fake.requests[0] != wantReq {
+		t.Fatalf("requests = %q, want %s", fake.requests, wantReq)
+	}
 	if m.mode != modeNormal || len(m.queue) != 1 {
-		t.Fatalf("enter should queue the op, mode %v queue %+v", m.mode, m.queue)
+		t.Fatalf("the ready op should queue, mode %v queue %+v", m.mode, m.queue)
 	}
 	op := m.queue[0]
-	if op.title != "ready #2 → mbhatg, zachsheer" {
-		t.Fatalf("title = %q", op.title)
+	if op.title != "ready #2 → mbhatg, zachsheer" ||
+		op.name+" "+strings.Join(op.args, " ") != "gh pr ready 2" {
+		t.Fatalf("op = %+v", op)
 	}
-	wantCmd := `gh api --silent -X POST 'repos/o/r/pulls/2/requested_reviewers'` +
-		` -f 'reviewers[]=mbhatg' -f 'reviewers[]=zachsheer'` +
-		` && echo 'requested review from mbhatg, zachsheer on #2' && gh pr ready 2`
-	if op.name != "sh" || len(op.args) != 2 || op.args[1] != wantCmd {
-		t.Fatalf("command = %s %q\nwant %s", op.name, op.args, wantCmd)
+}
+
+func TestReviewerRequestFailureKeepsDraft(t *testing.T) {
+	fake := &fakeGitHub{status: 422}
+	m := press(draftModel(t, fake), "D")
+	m = submit(t, m)
+	if len(fake.requests) != 1 || len(m.queue) != 0 || !m.flashErr ||
+		!strings.Contains(m.flash, "requesting review on #2") ||
+		!strings.Contains(m.flash, "nothing marked ready") {
+		t.Fatalf("a failed request should not mark ready, queue %+v flash %q", m.queue, m.flash)
 	}
 }
 
 func TestReviewerPickerEnterTakesHovered(t *testing.T) {
-	m := press(draftModel(), "D")
-	m = press(m, "a", "m", "y", "enter")
+	m := press(draftModel(t, &fakeGitHub{status: 201}), "D")
+	m = press(m, "a", "m", "y")
+	m = submit(t, m)
 	if len(m.queue) != 1 || m.queue[0].title != "ready #2 → amy" {
 		t.Fatalf("enter with nobody picked should take the hovered person, queue %+v", m.queue)
 	}
 
-	m = press(draftModel(), "D")
+	m = press(draftModel(t, &fakeGitHub{status: 201}), "D")
 	m = keys(m, keyCtrlS)
 	if len(m.queue) != 1 || m.queue[0].title != "ready #2" ||
 		m.queue[0].name+" "+strings.Join(m.queue[0].args, " ") != "gh pr ready 2" {
@@ -143,7 +215,7 @@ func TestReviewerPickerEnterTakesHovered(t *testing.T) {
 }
 
 func TestReadySkipsPickerWhenSomeoneIsRequested(t *testing.T) {
-	m := draftModel()
+	m := draftModel(t, &fakeGitHub{status: 201})
 	m.prs["two"].Reviewers = []string{"mbhatg"}
 	m = press(m, "D")
 	if m.mode != modeNormal || len(m.queue) != 1 || m.queue[0].title != "ready #2" {
@@ -151,7 +223,7 @@ func TestReadySkipsPickerWhenSomeoneIsRequested(t *testing.T) {
 	}
 
 	// Converting back to a draft never asks.
-	m = draftModel()
+	m = draftModel(t, &fakeGitHub{status: 201})
 	m.prs["two"].IsDraft = false
 	m = press(m, "D")
 	if m.mode != modeNormal || len(m.queue) != 1 || m.queue[0].title != "draft #2" {
@@ -159,7 +231,7 @@ func TestReadySkipsPickerWhenSomeoneIsRequested(t *testing.T) {
 	}
 
 	// Nor does a repository with nobody to ask.
-	m = draftModel()
+	m = draftModel(t, &fakeGitHub{status: 201})
 	m.reviewers = nil
 	m = press(m, "D")
 	if m.mode != modeNormal || len(m.queue) != 1 {
@@ -168,7 +240,7 @@ func TestReadySkipsPickerWhenSomeoneIsRequested(t *testing.T) {
 }
 
 func TestReviewerPickerWaitsForReviewers(t *testing.T) {
-	m := draftModel()
+	m := draftModel(t, &fakeGitHub{status: 201})
 	loaded := m.reviewers
 	m.reviewers, m.reviewersLoaded = nil, false
 	m = press(m, "D")
@@ -195,18 +267,5 @@ func TestReviewerPickerWaitsForReviewers(t *testing.T) {
 		if !strings.Contains(screen, want) {
 			t.Errorf("screen is missing %q:\n%s", want, screen)
 		}
-	}
-}
-
-func TestReadyForReviewOrdersEachPR(t *testing.T) {
-	repo := github.Repo{Host: "ghe.example.com", Owner: "o", Name: "r"}
-	title, name, args := readyForReview(
-		repo, []string{"2", "3"}, map[string]bool{"3": true}, []string{"amy"},
-	)
-	want := `gh pr ready 2 && gh api --hostname 'ghe.example.com' --silent -X POST` +
-		` 'repos/o/r/pulls/3/requested_reviewers' -f 'reviewers[]=amy'` +
-		` && echo 'requested review from amy on #3' && gh pr ready 3`
-	if title != "ready 2 PRs → amy" || name != "sh" || args[1] != want {
-		t.Fatalf("got %q %s %q\nwant %s", title, name, args, want)
 	}
 }

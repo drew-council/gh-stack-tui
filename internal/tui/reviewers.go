@@ -1,10 +1,12 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"sort"
 	"strings"
+	"time"
 	"unicode"
 
 	tea "charm.land/bubbletea/v2"
@@ -20,7 +22,7 @@ type pickerState struct {
 	// nums are the drafts to mark ready, and need the ones among them that
 	// get the reviewers.
 	nums []string
-	need map[string]bool
+	need []int
 	// subject and context describe the PRs in the header.
 	subject, context string
 	// suggested are GitHub's suggestions for the PRs in need, best first.
@@ -56,13 +58,13 @@ func needsReviewers(pr *github.PR) bool {
 // openPicker asks who should review the drafts in need before the drafts are
 // marked ready.
 func (m *Model) openPicker(drafts []*github.PR, need []*github.PR) tea.Cmd {
-	p := &pickerState{need: map[string]bool{}}
+	p := &pickerState{}
 	for _, pr := range drafts {
 		p.nums = append(p.nums, fmt.Sprint(pr.Number))
 	}
 	var teams, numbers []string
 	for _, pr := range need {
-		p.need[fmt.Sprint(pr.Number)] = true
+		p.need = append(p.need, pr.Number)
 		numbers = append(numbers, fmt.Sprintf("#%d", pr.Number))
 		for _, t := range pr.RequestedTeams {
 			if !slices.Contains(teams, t) {
@@ -267,64 +269,47 @@ func (m Model) handlePickerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// submitPicker asks logins to review the drafts in need and marks every draft
-// ready. With no logins the drafts are only marked ready.
+// reviewersRequestedMsg reports that reviewers were requested, and carries
+// the op that marks the drafts ready.
+type reviewersRequestedMsg struct {
+	ready pendingOp
+	err   error
+}
+
+// submitPicker asks logins to review the drafts in need, then marks every
+// draft ready. Reviewers are requested first, so if that fails the drafts
+// stay drafts. With no logins the drafts are only marked ready.
 func (m *Model) submitPicker(logins []string) tea.Cmd {
 	p := m.picker
 	m.closePicker()
 	m.marks = map[string]bool{}
 	m.visual = false
-	title, name, args := readyForReview(m.ghRepo, p.nums, p.need, logins)
-	return m.runQuietOp(title, name, args...)
-}
-
-// readyForReview returns the title and command that mark the drafts nums
-// ready for review, first asking logins to review the ones in need. Each PR
-// gets its reviewers before it leaves draft, so a failure leaves it a draft.
-func readyForReview(
-	repo github.Repo,
-	nums []string,
-	need map[string]bool,
-	logins []string,
-) (string, string, []string) {
-	title, name, args := draftToggle(nums, false)
+	title, name, args := draftToggle(p.nums, false)
+	ready := pendingOp{title: title, name: name, args: args, quiet: true}
 	if len(logins) == 0 {
-		return title, name, args
+		return m.enqueue(ready)
 	}
-	title += " → " + strings.Join(logins, ", ")
-	api := "gh api"
-	if repo.Host != "" && repo.Host != "github.com" {
-		api += " --hostname " + shellQuote(repo.Host)
+	if m.gh == nil {
+		return m.setFlash("not connected to GitHub yet", true)
 	}
-	var steps []string
-	for _, n := range nums {
-		if need[n] {
-			req := fmt.Sprintf(
-				"%s --silent -X POST %s",
-				api,
-				shellQuote(
-					fmt.Sprintf(
-						"repos/%s/%s/pulls/%s/requested_reviewers",
-						repo.Owner,
-						repo.Name,
-						n,
-					),
-				),
-			)
-			for _, l := range logins {
-				req += " -f " + shellQuote("reviewers[]="+l)
+	who := strings.Join(logins, ", ")
+	ready.title += " → " + who
+	client, need := m.gh, p.need
+	return tea.Batch(
+		m.setFlash("requesting review from "+who+"…", false),
+		func() tea.Msg {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			for _, n := range need {
+				if err := client.RequestReviewers(ctx, n, logins); err != nil {
+					return reviewersRequestedMsg{
+						err: fmt.Errorf("requesting review on #%d: %w", n, err),
+					}
+				}
 			}
-			steps = append(steps, req, "echo "+shellQuote(
-				fmt.Sprintf("requested review from %s on #%s", strings.Join(logins, ", "), n),
-			))
-		}
-		steps = append(steps, "gh pr ready "+n)
-	}
-	return title, "sh", []string{"-c", strings.Join(steps, " && ")}
-}
-
-func shellQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+			return reviewersRequestedMsg{ready: ready}
+		},
+	)
 }
 
 // fuzzyMatch reports whether the runes of query appear in s in order,

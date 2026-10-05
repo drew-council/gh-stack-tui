@@ -1,12 +1,8 @@
 package github
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"os/exec"
-	"strings"
 	"time"
 )
 
@@ -54,9 +50,10 @@ const nextReviewersQuery = `query($owner: String!, $name: String!, $after: Strin
   ` + assignableUsers + `
 }`
 
-// FetchReviewers lists the people who can review pull requests in repo, other
-// than the viewer, along with how often the viewer's recent PRs went to them.
-func FetchReviewers(ctx context.Context, repo Repo) ([]Reviewer, error) {
+// FetchReviewers lists the people who can review pull requests in the
+// repository, other than the viewer, along with how often the viewer's recent
+// PRs went to them.
+func (c *Client) FetchReviewers(ctx context.Context) ([]Reviewer, error) {
 	ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
 
@@ -72,13 +69,14 @@ func FetchReviewers(ctx context.Context, repo Repo) ([]Reviewer, error) {
 		return len(out) - 1
 	}
 
-	vars := map[string]string{
-		"owner": repo.Owner,
-		"name":  repo.Name,
+	vars := map[string]any{
+		"owner": c.Repo.Owner,
+		"name":  c.Repo.Name,
+		"after": nil,
 		"search": fmt.Sprintf(
 			"repo:%s/%s is:pr author:@me sort:created-desc",
-			repo.Owner,
-			repo.Name,
+			c.Repo.Owner,
+			c.Repo.Name,
 		),
 	}
 	// Repositories rarely have more than a few hundred assignable users;
@@ -108,7 +106,7 @@ func FetchReviewers(ctx context.Context, repo Repo) ([]Reviewer, error) {
 		if page == 0 {
 			query = firstReviewersQuery
 		}
-		if err := graphQL(ctx, repo, query, vars, &data); err != nil {
+		if err := c.graphQL(ctx, query, vars, &data); err != nil {
 			return nil, err
 		}
 		for _, u := range data.Repository.AssignableUsers.Nodes {
@@ -145,39 +143,4 @@ func FetchReviewers(ctx context.Context, repo Repo) ([]Reviewer, error) {
 		}
 	}
 	return reviewers, nil
-}
-
-// graphQL runs query through gh and decodes the response's data into out.
-func graphQL(
-	ctx context.Context,
-	repo Repo,
-	query string,
-	vars map[string]string,
-	out any,
-) error {
-	args := []string{"api", "graphql", "-f", "query=" + query}
-	if repo.Host != "" && repo.Host != "github.com" {
-		args = append(args, "--hostname", repo.Host)
-	}
-	for k, v := range vars {
-		args = append(args, "-f", k+"="+v)
-	}
-	cmd := exec.CommandContext(ctx, "gh", args...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		msg := strings.TrimSpace(stderr.String())
-		if msg == "" {
-			msg = err.Error()
-		}
-		return fmt.Errorf("gh api graphql: %s", msg)
-	}
-	var resp struct {
-		Data json.RawMessage `json:"data"`
-	}
-	if err := json.Unmarshal(stdout.Bytes(), &resp); err != nil {
-		return fmt.Errorf("gh api graphql: %w", err)
-	}
-	return json.Unmarshal(resp.Data, out)
 }

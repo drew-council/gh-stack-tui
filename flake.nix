@@ -48,7 +48,7 @@
             version = "0.1.0";
             src = ./.;
             nativeBuildInputs = [ pkgs.git ];
-            vendorHash = "sha256-nuJ2kgPC9EOfIPEMsuLXDrIV29Sp+yIQpZFWRTfishM=";
+            vendorHash = "sha256-rsSATpBA9y9A8B9XIQAYCAldsSj6NEZDGfMcHNJPQrw=";
             postInstall = ''
               mv $out/bin/gh-stack-tui $out/bin/ghst
             '';

@@ -487,12 +487,12 @@ func (m *Model) openHovered() tea.Cmd {
 	case rowCommit:
 		if pr != "" {
 			url = pr + "/commits/" + r.commit.SHA
-		} else if m.ghRepo.Owner != "" {
+		} else if m.gh != nil {
 			url = fmt.Sprintf(
 				"https://%s/%s/%s/commit/%s",
-				m.ghRepo.Host,
-				m.ghRepo.Owner,
-				m.ghRepo.Name,
+				m.gh.Repo.Host,
+				m.gh.Repo.Owner,
+				m.gh.Repo.Name,
 				r.commit.SHA,
 			)
 		}

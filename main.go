@@ -67,6 +67,11 @@ func main() {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
+	// gh, and go-gh's repository detection, work in the current directory.
+	if err := os.Chdir(repo.Root); err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		os.Exit(1)
+	}
 	if _, err := tea.NewProgram(tui.New(repo, opts)).Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)

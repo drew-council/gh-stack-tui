@@ -1,13 +1,11 @@
-// Package github fetches pull request and CI state through `gh api graphql`,
-// reusing the gh CLI's authentication.
+// Package github fetches pull request, CI, and reviewer state from GitHub
+// with go-gh, reusing the gh CLI's authentication.
 package github
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"os/exec"
 	"slices"
 	"strings"
 	"time"
@@ -105,22 +103,19 @@ const prFields = `number url title state isDraft merged reviewDecision mergeStat
 
 // FetchPRs returns the PR for each lookup, keyed by branch. Branches with no PR
 // are absent from the result.
-func FetchPRs(ctx context.Context, repo Repo, lookups []Lookup) (map[string]*PR, error) {
+func (c *Client) FetchPRs(ctx context.Context, lookups []Lookup) (map[string]*PR, error) {
 	if len(lookups) == 0 {
 		return map[string]*PR{}, nil
 	}
 
 	var q strings.Builder
-	args := []string{"api", "graphql", "-f", "owner=" + repo.Owner, "-f", "name=" + repo.Name}
-	if repo.Host != "" && repo.Host != "github.com" {
-		args = append(args, "--hostname", repo.Host)
-	}
+	vars := map[string]any{"owner": c.Repo.Owner, "name": c.Repo.Name}
 	var params []string
 	for i, l := range lookups {
 		if l.Number == 0 {
 			v := fmt.Sprintf("h%d", i)
 			params = append(params, fmt.Sprintf("$%s: String!", v))
-			args = append(args, "-f", v+"="+l.Branch)
+			vars[v] = l.Branch
 		}
 	}
 	fmt.Fprintf(
@@ -142,43 +137,22 @@ func FetchPRs(ctx context.Context, repo Repo, lookups []Lookup) (map[string]*PR,
 		}
 	}
 	q.WriteString("} }")
-	args = append(args, "-f", "query="+q.String())
 
 	ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "gh", args...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	runErr := cmd.Run()
-
-	// gh exits non-zero on partial GraphQL errors (for example one PR number
-	// that no longer resolves) but still prints the data, so parse first.
-	var resp struct {
-		Data struct {
-			Repository map[string]json.RawMessage `json:"repository"`
-		} `json:"data"`
-		Errors []struct {
-			Message string `json:"message"`
-		} `json:"errors"`
+	var data struct {
+		Repository map[string]json.RawMessage `json:"repository"`
 	}
-	if err := json.Unmarshal(stdout.Bytes(), &resp); err != nil || resp.Data.Repository == nil {
-		if runErr != nil {
-			msg := strings.TrimSpace(stderr.String())
-			if msg == "" {
-				msg = runErr.Error()
-			}
-			return nil, fmt.Errorf("gh api graphql: %s", msg)
-		}
-		if len(resp.Errors) > 0 {
-			return nil, fmt.Errorf("gh api graphql: %s", resp.Errors[0].Message)
-		}
-		return nil, fmt.Errorf("gh api graphql: unexpected response")
+	// A partial error (for example one PR number that no longer resolves)
+	// still comes with the data for the rest.
+	if err := c.graphQL(ctx, q.String(), vars, &data); err != nil &&
+		(!partial(err) || data.Repository == nil) {
+		return nil, err
 	}
 
 	out := map[string]*PR{}
 	for i, l := range lookups {
-		raw := resp.Data.Repository[fmt.Sprintf("b%d", i)]
+		raw := data.Repository[fmt.Sprintf("b%d", i)]
 		if len(raw) == 0 || string(raw) == "null" {
 			continue
 		}
