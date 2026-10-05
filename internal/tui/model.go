@@ -37,6 +37,7 @@ const (
 	modePrompt
 	modeConfirm
 	modeHelp
+	modeReviewers
 )
 
 // Model is the root Bubble Tea model.
@@ -61,6 +62,13 @@ type Model struct {
 	fingerprint   string
 	ghRepo        github.Repo
 
+	// reviewers are the people who can review PRs in the repository, loaded
+	// once in the background after the first remote load.
+	reviewers        []github.Reviewer
+	reviewersLoaded  bool
+	loadingReviewers bool
+	reviewersErr     error
+
 	st styles
 
 	rows      []row
@@ -79,6 +87,7 @@ type Model struct {
 	input      textinput.Model
 	promptKind promptKind
 	confirm    *confirmState
+	picker     *pickerState
 
 	op          *opState
 	queue       []pendingOp
@@ -138,6 +147,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKey(msg)
 
 	case tea.MouseWheelMsg:
+		if m.mode == modeReviewers {
+			switch msg.Mouse().Button {
+			case tea.MouseWheelUp:
+				m.picker.move(-1)
+			case tea.MouseWheelDown:
+				m.picker.move(1)
+			}
+			m.ensurePickerVisible()
+			return m, nil
+		}
 		switch msg.Mouse().Button {
 		case tea.MouseWheelUp:
 			m.scroll -= 3
@@ -177,6 +196,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case remoteLoadedMsg:
 		return m.applyRemote(msg)
 
+	case reviewersLoadedMsg:
+		return m.applyReviewers(msg), nil
+
 	case opLineMsg:
 		m.appendOutput(msg.line)
 		return m, waitOp(msg.ch)
@@ -201,9 +223,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if m.mode == modePrompt {
+	switch m.mode {
+	case modePrompt:
 		var cmd tea.Cmd
 		m.input, cmd = m.input.Update(msg)
+		return m, cmd
+	case modeReviewers:
+		// Pastes and cursor blinks; a paste changes the filter.
+		var cmd tea.Cmd
+		m.input, cmd = m.input.Update(msg)
+		m.filterPicker()
 		return m, cmd
 	}
 	return m, nil

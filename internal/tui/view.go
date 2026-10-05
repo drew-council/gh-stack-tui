@@ -35,8 +35,12 @@ func (m Model) render() string {
 
 	body := m.bodyLines()
 	h := m.bodyHeight()
-	if m.mode == modeHelp {
-		body = m.helpLines()
+	if m.mode == modeHelp || m.mode == modeReviewers {
+		if m.mode == modeHelp {
+			body = m.helpLines()
+		} else {
+			body = m.pickerLines(h)
+		}
 		if len(body) > h {
 			body = body[:h]
 		}
@@ -629,6 +633,11 @@ func (m Model) footer() string {
 		return s.warn.Render(m.confirm.text)
 	case modeHelp:
 		return s.dim.Render("press any key to close help")
+	case modeReviewers:
+		return m.hints(
+			"↑/↓", "move", "tab", "pick", "enter", "request review + mark ready",
+			"ctrl+s", "mark ready without", "esc", "cancel",
+		)
 	}
 	switch m.pendingKey {
 	case "r":

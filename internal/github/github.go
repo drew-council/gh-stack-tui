@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"slices"
 	"strings"
 	"time"
 )
@@ -46,6 +47,19 @@ type PR struct {
 	ChangesRequested int
 	// Unresolved is the number of review threads still open.
 	Unresolved int
+	// Reviewers are the people other than the author who were asked to
+	// review or have reviewed. RequestedTeams are the teams asked to review,
+	// such as CODEOWNERS teams.
+	Reviewers      []string
+	RequestedTeams []string
+	// Suggested are GitHub's reviewer suggestions for the PR, best first.
+	Suggested []string
+}
+
+// NeedsReviewers reports whether nobody has been asked to review the PR in
+// person: no user is requested, at most teams, and nobody has reviewed yet.
+func (pr *PR) NeedsReviewers() bool {
+	return len(pr.Reviewers) == 0
 }
 
 // ReviewStatus summarizes where an open PR stands with its reviewers.
@@ -74,8 +88,13 @@ func (pr *PR) Review() ReviewStatus {
 }
 
 const prFields = `number url title state isDraft merged reviewDecision mergeStateStatus
+  author { login }
   mergeQueueEntry { state }
   latestOpinionatedReviews(first: 100) { nodes { state } }
+  latestReviews(first: 50) { nodes { author { __typename login } } }
+  reviewRequests(first: 50) { nodes { requestedReviewer {
+    __typename ... on User { login } ... on Team { slug } } } }
+  suggestedReviewerActors(first: 10) { nodes { reviewer { __typename ... on User { login } } } }
   reviewThreads(first: 100) { nodes { isResolved } }
   commits(last: 1) { nodes { commit { oid statusCheckRollup { state contexts(first: 100) { nodes {
     __typename
@@ -202,9 +221,25 @@ type prNode struct {
 	Merged           bool   `json:"merged"`
 	ReviewDecision   string `json:"reviewDecision"`
 	MergeStateStatus string `json:"mergeStateStatus"`
+	Author           *actor `json:"author"`
 	MergeQueueEntry  *struct {
 		State string `json:"state"`
 	} `json:"mergeQueueEntry"`
+	LatestReviews struct {
+		Nodes []struct {
+			Author *actor `json:"author"`
+		} `json:"nodes"`
+	} `json:"latestReviews"`
+	ReviewRequests struct {
+		Nodes []struct {
+			RequestedReviewer *actor `json:"requestedReviewer"`
+		} `json:"nodes"`
+	} `json:"reviewRequests"`
+	SuggestedReviewerActors struct {
+		Nodes []struct {
+			Reviewer *actor `json:"reviewer"`
+		} `json:"nodes"`
+	} `json:"suggestedReviewerActors"`
 	LatestOpinionatedReviews struct {
 		Nodes []struct {
 			State string `json:"state"`
@@ -228,6 +263,21 @@ type prNode struct {
 			} `json:"commit"`
 		} `json:"nodes"`
 	} `json:"commits"`
+}
+
+// actor is a user, bot, or team. Team has a slug in place of a login.
+type actor struct {
+	Typename string `json:"__typename"`
+	Login    string `json:"login"`
+	Slug     string `json:"slug"`
+}
+
+// user returns the login of a person, or "" for bots, teams, and nil.
+func (a *actor) user() string {
+	if a == nil || a.Typename != "User" {
+		return ""
+	}
+	return a.Login
 }
 
 type contextNode struct {
@@ -282,6 +332,29 @@ func (n *prNode) toPR() *PR {
 	for _, t := range n.ReviewThreads.Nodes {
 		if !t.IsResolved {
 			pr.Unresolved++
+		}
+	}
+	author := ""
+	if n.Author != nil {
+		author = n.Author.Login
+	}
+	addReviewer := func(login string) {
+		if login != "" && login != author && !slices.Contains(pr.Reviewers, login) {
+			pr.Reviewers = append(pr.Reviewers, login)
+		}
+	}
+	for _, r := range n.ReviewRequests.Nodes {
+		if a := r.RequestedReviewer; a != nil && a.Typename == "Team" {
+			pr.RequestedTeams = append(pr.RequestedTeams, a.Slug)
+		}
+		addReviewer(r.RequestedReviewer.user())
+	}
+	for _, r := range n.LatestReviews.Nodes {
+		addReviewer(r.Author.user())
+	}
+	for _, s := range n.SuggestedReviewerActors.Nodes {
+		if login := s.Reviewer.user(); login != "" && login != author {
+			pr.Suggested = append(pr.Suggested, login)
 		}
 	}
 	if len(n.Commits.Nodes) > 0 {

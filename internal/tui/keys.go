@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/drew-council/gh-stack-tui/internal/github"
 	"github.com/drew-council/gh-stack-tui/internal/stack"
 )
 
@@ -55,7 +56,7 @@ var helpSections = []helpSection{
 		{"e", "edit file in $EDITOR"},
 		{"c", "checkout branch"},
 		{"M", "merge PR (and below)"},
-		{"D", "toggle PR(s) draft / ready"},
+		{"D", "toggle PR(s) draft / ready (asks for reviewers)"},
 	}},
 	{"stack", [][2]string{
 		{"p", "push"},
@@ -86,6 +87,9 @@ var helpSections = []helpSection{
 
 func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
+	if m.mode == modeReviewers {
+		return m.handlePickerKey(msg)
+	}
 	if key == "ctrl+c" {
 		if m.cancelOp() {
 			return m, m.setFlash("cancelling "+m.op.title+"…", false)
@@ -615,23 +619,30 @@ func (m *Model) confirmMerge() tea.Cmd {
 // toggleDraft flips the draft state of the open PRs in the review selection
 // (marks, visual range, or the hovered branch). Drafts are marked ready for
 // review; when the selection has none, its PRs are converted back to drafts.
-// It needs live PR data, since the stack file does not record draft state.
+// When a draft has nobody asked to review it in person, only teams, a picker
+// asks who should review it first. It needs live PR data, since the stack
+// file does not record draft or review state.
 func (m *Model) toggleDraft() tea.Cmd {
 	if m.snap == nil || len(m.snap.Branches) == 0 {
 		return nil
 	}
 	sel := m.reviewSelection()
-	var drafts, ready []string
+	var drafts, need []*github.PR
+	var draftNums, ready []string
 	for _, i := range sel {
 		if pr := m.prFor(i); pr != nil && pr.State == "OPEN" && !pr.Merged {
 			if pr.IsDraft {
-				drafts = append(drafts, fmt.Sprint(pr.Number))
+				drafts = append(drafts, pr)
+				draftNums = append(draftNums, fmt.Sprint(pr.Number))
+				if needsReviewers(pr) {
+					need = append(need, pr)
+				}
 			} else {
 				ready = append(ready, fmt.Sprint(pr.Number))
 			}
 		}
 	}
-	nums, undo := drafts, false
+	nums, undo := draftNums, false
 	if len(nums) == 0 {
 		nums, undo = ready, true
 	}
@@ -640,6 +651,10 @@ func (m *Model) toggleDraft() tea.Cmd {
 			return m.draftRefusal(sel[0])
 		}
 		return m.setFlash("no open PR selected", true)
+	}
+	// Skip the picker when the repository has nobody to ask.
+	if len(need) > 0 && !(m.reviewersLoaded && len(m.reviewers) == 0) {
+		return m.openPicker(drafts, need)
 	}
 	m.marks = map[string]bool{}
 	m.visual = false

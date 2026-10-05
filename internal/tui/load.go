@@ -32,6 +32,11 @@ type (
 		prs  map[string]*github.PR
 		err  error
 	}
+
+	reviewersLoadedMsg struct {
+		reviewers []github.Reviewer
+		err       error
+	}
 )
 
 func pollTick(d time.Duration) tea.Cmd {
@@ -261,5 +266,33 @@ func (m Model) applyRemote(msg remoteLoadedMsg) (tea.Model, tea.Cmd) {
 	m.buildRows()
 	m.restoreCursor(fallback)
 	m.ensureVisible()
-	return m, cmd
+	return m, tea.Batch(cmd, m.requestReviewers())
+}
+
+// requestReviewers loads the people who can review PRs in the background,
+// once the repository is known. The list does not change while the TUI
+// runs, so it is fetched once and retried only after a failure.
+func (m *Model) requestReviewers() tea.Cmd {
+	if m.reviewersLoaded || m.loadingReviewers || m.ghRepo.Owner == "" {
+		return nil
+	}
+	m.loadingReviewers = true
+	repo := m.ghRepo
+	return func() tea.Msg {
+		reviewers, err := github.FetchReviewers(context.Background(), repo)
+		return reviewersLoadedMsg{reviewers: reviewers, err: err}
+	}
+}
+
+func (m Model) applyReviewers(msg reviewersLoadedMsg) Model {
+	m.loadingReviewers = false
+	m.reviewersErr = msg.err
+	if msg.err == nil {
+		m.reviewers = msg.reviewers
+		m.reviewersLoaded = true
+	}
+	if m.picker != nil {
+		m.picker.setCandidates(m.reviewers)
+	}
+	return m
 }

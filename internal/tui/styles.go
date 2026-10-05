@@ -55,6 +55,7 @@ type styles struct {
 	err  lipgloss.Style
 
 	selected lipgloss.Style // review-selection pill
+	match    lipgloss.Style // fuzzy-matched characters
 
 	// Chrome
 	title    lipgloss.Style
@@ -124,6 +125,8 @@ func newStyles() styles {
 		Background(s.green).
 		Bold(true).
 		Padding(0, 1)
+
+	s.match = fg(s.accent).Bold(true)
 
 	s.title = fg(s.text).Bold(true)
 	s.key = fg(s.text)
