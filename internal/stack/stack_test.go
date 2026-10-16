@@ -1,7 +1,6 @@
 package stack
 
 import (
-	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -9,13 +8,14 @@ import (
 	"testing"
 
 	"github.com/drew-council/gh-stack-tui/internal/git"
+	"github.com/github/gh-stack/shim/ghstack"
 )
 
 func TestSelect(t *testing.T) {
 	f := &File{Stacks: []Stack{
-		{Number: 1, Trunk: BranchRef{Branch: "main"}, Branches: []BranchRef{{Branch: "a"}}},
-		{Number: 2, Trunk: BranchRef{Branch: "main"}, Branches: []BranchRef{{Branch: "b"}}},
-		{Number: 3, Trunk: BranchRef{Branch: "main"}, Branches: []BranchRef{{Branch: "c"}}},
+		{Number: 1, Trunk: "main", Branches: []ghstack.Branch{{Name: "a"}}},
+		{Number: 2, Trunk: "main", Branches: []ghstack.Branch{{Name: "b"}}},
+		{Number: 3, Trunk: "main", Branches: []ghstack.Branch{{Name: "c"}}},
 	}}
 	cases := []struct {
 		name                      string
@@ -28,7 +28,7 @@ func TestSelect(t *testing.T) {
 		{"defaults to newest", "", "", "", 2},
 	}
 	for _, c := range cases {
-		if got := f.Select(c.pinned, c.current, c.previous); got != c.want {
+		if got := Select(f, c.pinned, c.current, c.previous); got != c.want {
 			t.Errorf("%s: Select = %d, want %d", c.name, got, c.want)
 		}
 	}
@@ -50,6 +50,17 @@ func gitRun(t *testing.T, dir string, args ...string) string {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
 	}
 	return strings.TrimSpace(string(out))
+}
+
+// writeCatalog records stacks the way gh-stack does, in the common git
+// directory of the repository at dir.
+func writeCatalog(t *testing.T, dir, stacks string) {
+	t.Helper()
+	commonDir := gitRun(t, dir, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	data := `{"schemaVersion": 1, "repository": "github.com:o/r", "stacks": ` + stacks + `}`
+	if err := os.WriteFile(ghstack.CatalogPath(commonDir), []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func commit(t *testing.T, dir, file string) string {
@@ -78,18 +89,10 @@ func TestLoadAfterParentSquashMerge(t *testing.T) {
 	commit(t, dir, "one-squashed")
 	gitRun(t, dir, "checkout", "-q", "two")
 
-	f := File{SchemaVersion: 1, Repository: "github.com:o/r", Stacks: []Stack{{
-		Number: 7,
-		Trunk:  BranchRef{Branch: "main"},
-		Branches: []BranchRef{
-			{Branch: "one", PullRequest: &PullRequestRef{Number: 1, Merged: true}},
-			{Branch: "two", Base: oneHead, PullRequest: &PullRequestRef{Number: 2}},
-		},
-	}}}
-	data, _ := json.Marshal(f)
-	if err := os.WriteFile(filepath.Join(dir, ".git", FileName), data, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeCatalog(t, dir, `[{"number": 7, "trunk": {"branch": "main"}, "branches": [
+		{"branch": "one", "pullRequest": {"number": 1, "merged": true}},
+		{"branch": "two", "base": "`+oneHead+`", "pullRequest": {"number": 2}}
+	]}]`)
 
 	repo, err := git.Open(dir)
 	if err != nil {
@@ -131,15 +134,9 @@ func TestLoadFromLinkedWorktree(t *testing.T) {
 	wt := filepath.Join(t.TempDir(), "wt")
 	gitRun(t, dir, "worktree", "add", "-qb", "feature", wt)
 
-	f := File{SchemaVersion: 1, Repository: "github.com:o/r", Stacks: []Stack{{
-		Number:   7,
-		Trunk:    BranchRef{Branch: "main"},
-		Branches: []BranchRef{{Branch: "feature"}},
-	}}}
-	data, _ := json.Marshal(f)
-	if err := os.WriteFile(filepath.Join(dir, ".git", FileName), data, 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeCatalog(t, wt, `[{"number": 7, "trunk": {"branch": "main"}, "branches": [
+		{"branch": "feature"}
+	]}]`)
 
 	repo, err := git.Open(wt)
 	if err != nil {

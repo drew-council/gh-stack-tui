@@ -48,7 +48,9 @@
             version = "0.1.0";
             src = ./.;
             nativeBuildInputs = [ pkgs.git ];
-            vendorHash = "sha256-rsSATpBA9y9A8B9XIQAYCAldsSj6NEZDGfMcHNJPQrw=";
+            vendorHash = "sha256-cwjqtdYR84Ha9x2ttxOI9F48LVythfKiZW2Xn8VBJk4=";
+            # The gh-stack shim is its own module; see third_party/gh-stack.
+            excludedPackages = [ "third_party" ];
             postInstall = ''
               mv $out/bin/gh-stack-tui $out/bin/ghst
             '';

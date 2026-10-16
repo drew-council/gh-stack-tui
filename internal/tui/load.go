@@ -91,8 +91,8 @@ func (m *Model) loadLocal() tea.Cmd {
 	return func() tea.Msg {
 		if wantNumber != 0 {
 			if f, err := stack.ReadFile(repo.CommonDir); err == nil {
-				if i := f.FindNumber(wantNumber); i >= 0 {
-					pinned = f.Stacks[i].Key()
+				if i := stack.FindNumber(f, wantNumber); i >= 0 {
+					pinned = stack.Key(f.Stacks[i])
 				}
 			}
 		}

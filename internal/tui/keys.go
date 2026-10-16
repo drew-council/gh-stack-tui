@@ -312,7 +312,7 @@ func (m *Model) cycleStack(key string) tea.Cmd {
 	if err != nil || next >= len(f.Stacks) {
 		return m.setFlash("reading stack file failed", true)
 	}
-	m.pinned = f.Stacks[next].Key()
+	m.pinned = stack.Key(f.Stacks[next])
 	m.pinnedCurrent = m.snap.CurrentBranch
 	return m.requestLocal()
 }

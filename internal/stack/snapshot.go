@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/drew-council/gh-stack-tui/internal/git"
+	"github.com/github/gh-stack/shim/ghstack"
 )
 
 // Snapshot is the fully resolved local state of one stack.
@@ -57,15 +58,15 @@ func Load(repo *git.Repo, pinned, previous string) (*Snapshot, error) {
 		StackCount:    len(f.Stacks),
 		Dirty:         repo.Dirty(),
 		Rebasing:      rebasing(repo.GitDir),
-		Index:         f.Select(pinned, current, previous),
+		Index:         Select(f, pinned, current, previous),
 	}
 	if snap.Index < 0 {
 		return snap, nil
 	}
 	s := f.Stacks[snap.Index]
-	snap.Key = s.Key()
+	snap.Key = Key(s)
 	snap.Number = s.Number
-	snap.Trunk = s.Trunk.Branch
+	snap.Trunk = s.Trunk
 
 	heads, err := repo.BranchHeads()
 	if err != nil {
@@ -77,12 +78,12 @@ func Load(repo *git.Repo, pinned, previous string) (*Snapshot, error) {
 	sem := make(chan struct{}, 4)
 	for i, ref := range s.Branches {
 		snap.Branches[i] = Branch{
-			Name:      ref.Branch,
-			Parent:    activeParent(s, i),
-			Head:      heads[ref.Branch],
-			PR:        ref.PullRequest,
-			Merged:    ref.Merged(),
-			IsCurrent: ref.Branch == current,
+			Name:      ref.Name,
+			Parent:    ref.Parent,
+			Head:      heads[ref.Name],
+			PR:        ref.PR,
+			Merged:    ref.Merged,
+			IsCurrent: ref.Name == current,
 		}
 		wg.Go(func() {
 			sem <- struct{}{}
@@ -107,17 +108,6 @@ func (s *Snapshot) IndexOf(name string) int {
 // HasBranch reports whether the snapshot's stack contains branch.
 func (s *Snapshot) HasBranch(name string) bool {
 	return s.IndexOf(name) >= 0
-}
-
-// activeParent mirrors gh-stack's ActiveBaseBranch: the nearest unmerged
-// branch below, or trunk.
-func activeParent(s Stack, idx int) string {
-	for j := idx - 1; j >= 0; j-- {
-		if !s.Branches[j].Merged() {
-			return s.Branches[j].Branch
-		}
-	}
-	return s.Trunk.Branch
 }
 
 func resolveBranch(repo *git.Repo, b *Branch, recordedBase string) {
@@ -170,7 +160,7 @@ func rebasing(gitDir string) bool {
 // addition to ref movement.
 func StateFiles(repo *git.Repo) []string {
 	return []string{
-		filepath.Join(repo.CommonDir, FileName),
+		ghstack.CatalogPath(repo.CommonDir),
 		filepath.Join(repo.GitDir, "rebase-merge"),
 		filepath.Join(repo.GitDir, "rebase-apply"),
 	}
