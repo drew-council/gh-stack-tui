@@ -15,9 +15,11 @@ import (
 type Repo struct {
 	// Root is the top level of the working tree.
 	Root string
-	// GitDir is the absolute git directory, which is where gh-stack keeps its
-	// stack file.
+	// GitDir is the absolute git directory of this working tree.
 	GitDir string
+	// CommonDir is the absolute git directory shared by every working tree,
+	// which is where gh-stack keeps its stack file.
+	CommonDir string
 }
 
 // Open resolves the repository containing dir.
@@ -31,7 +33,11 @@ func Open(dir string) (*Repo, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Repo{Root: root, GitDir: gitDir}, nil
+	commonDir, err := r.run("rev-parse", "--path-format=absolute", "--git-common-dir")
+	if err != nil {
+		return nil, err
+	}
+	return &Repo{Root: root, GitDir: gitDir, CommonDir: commonDir}, nil
 }
 
 func (r *Repo) run(args ...string) (string, error) {

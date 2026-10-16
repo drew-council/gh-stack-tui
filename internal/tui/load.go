@@ -51,7 +51,7 @@ func (m *Model) fingerprintCmd() tea.Cmd {
 	repo := m.repo
 	return func() tea.Msg {
 		var extra []string
-		for _, p := range stack.StateFiles(repo.GitDir) {
+		for _, p := range stack.StateFiles(repo) {
 			if fi, err := os.Stat(p); err == nil {
 				extra = append(
 					extra,
@@ -90,7 +90,7 @@ func (m *Model) loadLocal() tea.Cmd {
 	}
 	return func() tea.Msg {
 		if wantNumber != 0 {
-			if f, err := stack.ReadFile(repo.GitDir); err == nil {
+			if f, err := stack.ReadFile(repo.CommonDir); err == nil {
 				if i := f.FindNumber(wantNumber); i >= 0 {
 					pinned = f.Stacks[i].Key()
 				}

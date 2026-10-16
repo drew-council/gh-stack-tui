@@ -46,7 +46,7 @@ type Branch struct {
 // Load reads the stack file and resolves the selected stack against git.
 // pinned and previous are stack keys as described by [File.Select].
 func Load(repo *git.Repo, pinned, previous string) (*Snapshot, error) {
-	f, err := ReadFile(repo.GitDir)
+	f, err := ReadFile(repo.CommonDir)
 	if err != nil {
 		return nil, err
 	}
@@ -168,10 +168,10 @@ func rebasing(gitDir string) bool {
 
 // StateFiles are the paths whose modification should trigger a local reload in
 // addition to ref movement.
-func StateFiles(gitDir string) []string {
+func StateFiles(repo *git.Repo) []string {
 	return []string{
-		filepath.Join(gitDir, FileName),
-		filepath.Join(gitDir, "rebase-merge"),
-		filepath.Join(gitDir, "rebase-apply"),
+		filepath.Join(repo.CommonDir, FileName),
+		filepath.Join(repo.GitDir, "rebase-merge"),
+		filepath.Join(repo.GitDir, "rebase-apply"),
 	}
 }

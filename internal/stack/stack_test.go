@@ -121,3 +121,35 @@ func TestLoadAfterParentSquashMerge(t *testing.T) {
 		)
 	}
 }
+
+// TestLoadFromLinkedWorktree covers gh-stack keeping one stack file in the
+// common git directory, which a linked worktree must read rather than its own.
+func TestLoadFromLinkedWorktree(t *testing.T) {
+	dir := t.TempDir()
+	gitRun(t, dir, "init", "-q", "-b", "main")
+	commit(t, dir, "root")
+	wt := filepath.Join(t.TempDir(), "wt")
+	gitRun(t, dir, "worktree", "add", "-qb", "feature", wt)
+
+	f := File{SchemaVersion: 1, Repository: "github.com:o/r", Stacks: []Stack{{
+		Number:   7,
+		Trunk:    BranchRef{Branch: "main"},
+		Branches: []BranchRef{{Branch: "feature"}},
+	}}}
+	data, _ := json.Marshal(f)
+	if err := os.WriteFile(filepath.Join(dir, ".git", FileName), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	repo, err := git.Open(wt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snap, err := Load(repo, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snap.Number != 7 || len(snap.Branches) != 1 || !snap.Branches[0].IsCurrent {
+		t.Fatalf("snapshot = %+v, want stack 7 with feature checked out", snap)
+	}
+}

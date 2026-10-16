@@ -308,7 +308,7 @@ func (m *Model) cycleStack(key string) tea.Cmd {
 		delta = -1
 	}
 	next := (m.snap.Index + delta + m.snap.StackCount) % m.snap.StackCount
-	f, err := stack.ReadFile(m.repo.GitDir)
+	f, err := stack.ReadFile(m.repo.CommonDir)
 	if err != nil || next >= len(f.Stacks) {
 		return m.setFlash("reading stack file failed", true)
 	}

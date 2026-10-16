@@ -11,7 +11,8 @@ import (
 	"strings"
 )
 
-// FileName is the stack file gh-stack keeps inside the git directory.
+// FileName is the stack file gh-stack keeps inside the common git directory,
+// shared by every worktree.
 const FileName = "gh-stack"
 
 // File mirrors the schema of .git/gh-stack (schemaVersion 1).
@@ -74,10 +75,10 @@ func (s Stack) Contains(branch string) bool {
 	return false
 }
 
-// ReadFile loads the stack file from gitDir. A missing file is reported as an
-// empty stack list rather than an error.
-func ReadFile(gitDir string) (*File, error) {
-	data, err := os.ReadFile(filepath.Join(gitDir, FileName))
+// ReadFile loads the stack file from commonDir. A missing file is reported as
+// an empty stack list rather than an error.
+func ReadFile(commonDir string) (*File, error) {
+	data, err := os.ReadFile(filepath.Join(commonDir, FileName))
 	if os.IsNotExist(err) {
 		return &File{}, nil
 	}
