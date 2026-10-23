@@ -124,8 +124,10 @@ func resolveBranch(repo *git.Repo, b *Branch, recordedBase string) {
 	b.Commits, _ = repo.Log(b.DiffBase, b.Head)
 	b.Files, _ = repo.Diff(b.DiffBase, b.Head)
 	for _, f := range b.Files {
-		b.Additions += f.Additions
-		b.Deletions += f.Deletions
+		if !f.Generated {
+			b.Additions += f.Additions
+			b.Deletions += f.Deletions
+		}
 	}
 }
 
@@ -163,5 +165,6 @@ func StateFiles(repo *git.Repo) []string {
 		ghstack.CatalogPath(repo.CommonDir),
 		filepath.Join(repo.GitDir, "rebase-merge"),
 		filepath.Join(repo.GitDir, "rebase-apply"),
+		filepath.Join(repo.Root, ".gitattributes"),
 	}
 }

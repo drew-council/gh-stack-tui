@@ -427,3 +427,64 @@ func TestRenderLayout(t *testing.T) {
 		}
 	}
 }
+
+func TestGeneratedFilesGroupedAndCollapsible(t *testing.T) {
+	m := testModel()
+	m.snap.Branches[1].Files = []git.FileChange{
+		{Path: "a.pb.go", Status: "M", Binary: true, Generated: true},
+		{Path: "a.go", Status: "M", Additions: 3},
+		{Path: "b_gen.go", Status: "A", Additions: 100, Generated: true},
+		{Path: "b.go", Status: "A", Additions: 9},
+	}
+	m.buildRows()
+
+	// Opening files shows only non-generated files in the count and at the
+	// top level, with generated files collapsed into a subgroup below them.
+	m = press(m, "f", "l", "j", "j")
+	if r := hovered(t, m); r.kind != rowGenerated || r.count != 2 {
+		t.Fatalf("expected collapsed generated group of 2, got %+v", r)
+	}
+
+	// Expanding the generated subgroup reveals the generated files at indent 6.
+	m = press(m, "l", "j")
+	if r := hovered(t, m); r.kind != rowFile || r.file.Path != "a.pb.go" {
+		t.Fatalf("expected first generated file, got %+v", r)
+	}
+
+	var lines []string
+	for _, l := range strings.Split(m.render(), "\n") {
+		lines = append(lines, strings.TrimRight(ansi.Strip(l), " "))
+	}
+	want := []string{
+		"├ four",
+		"│",
+		"├ three",
+		"│  ▸ 1 file changed",
+		"│",
+		"├ ○ #2 OPEN  ✗ checks  Second layer",
+		"│ two (current)  +12 -0",
+		"│ approved · 2 unresolved comments",
+		"│  ▾ 2 files changed",
+		"│    a.go  +3 -0",
+		"│    b.go  +9 -0",
+		"│    ▾ 2 generated files",
+		"│    ▶ a.pb.go  binary",
+		"│      b_gen.go  +100 -0",
+	}
+	top := len(m.headerLines())
+	body := lines[top : top+len(want)]
+	for i := range want {
+		if body[i] != want[i] {
+			t.Fatalf("line %d = %q, want %q\n%s", i, body[i], want[i], strings.Join(body, "\n"))
+		}
+	}
+
+	// h on a generated file closes the generated subgroup and parks on it;
+	// h again climbs back onto the branch.
+	m = press(m, "h")
+	if r := hovered(t, m); r.kind != rowGenerated || m.expanded[r.key] {
+		t.Fatalf("h on generated file should collapse subgroup and park on it, got %+v", r)
+	}
+	m = press(m, "h")
+	onBranch(t, m, "two")
+}

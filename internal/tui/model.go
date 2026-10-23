@@ -323,7 +323,7 @@ func (m *Model) click(x, y int) tea.Cmd {
 			}
 			m.expanded[r.key] = !m.expanded[r.key]
 			m.rebuild()
-		case r.kind == rowWorkflow:
+		case r.kind == rowWorkflow || r.kind == rowGenerated:
 			m.setCursor(i)
 			m.expanded[r.key] = !m.expanded[r.key]
 			m.rebuild()

@@ -150,3 +150,56 @@ func TestLoadFromLinkedWorktree(t *testing.T) {
 		t.Fatalf("snapshot = %+v, want stack 7 with feature checked out", snap)
 	}
 }
+
+func TestLoadOmitsGeneratedFilesFromDiffCounts(t *testing.T) {
+	dir := t.TempDir()
+	gitRun(t, dir, "init", "-q", "-b", "main")
+	if err := os.WriteFile(
+		filepath.Join(dir, ".gitattributes"),
+		[]byte(
+			"*_gen.go linguist-generated=true\n*.pb.go -diff linguist-generated\n*.gen.txt generated=true\n",
+		),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+	gitRun(t, dir, "add", ".gitattributes")
+	gitRun(t, dir, "commit", "-qm", "init")
+
+	gitRun(t, dir, "checkout", "-qb", "feature")
+	commit(t, dir, "hand.go")
+	commit(t, dir, "types_gen.go")
+	commit(t, dir, "proto.pb.go")
+	commit(t, dir, "doc.gen.txt")
+
+	writeCatalog(t, dir, `[{"number": 1, "trunk": {"branch": "main"}, "branches": [
+		{"branch": "feature"}
+	]}]`)
+
+	repo, err := git.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snap, err := Load(repo, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := snap.Branches[0]
+	if b.Additions != 1 || b.Deletions != 0 {
+		t.Fatalf("diff stat = +%d -%d, want +1 -0 (non-generated only)", b.Additions, b.Deletions)
+	}
+	wantGen := map[string]bool{
+		"hand.go":      false,
+		"types_gen.go": true,
+		"proto.pb.go":  true,
+		"doc.gen.txt":  true,
+	}
+	if len(b.Files) != len(wantGen) {
+		t.Fatalf("files = %+v, want %d files", b.Files, len(wantGen))
+	}
+	for _, f := range b.Files {
+		if want, ok := wantGen[f.Path]; !ok || f.Generated != want {
+			t.Errorf("file %s Generated = %v, want %v", f.Path, f.Generated, want)
+		}
+	}
+}

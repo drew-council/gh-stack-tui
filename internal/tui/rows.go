@@ -11,6 +11,7 @@ const (
 	rowBranch rowKind = iota
 	rowSection
 	rowFile
+	rowGenerated
 	rowCommit
 	rowWorkflow
 	rowCheck
@@ -41,6 +42,7 @@ type row struct {
 	workflow *github.Workflow
 	check    *github.Check
 	label    string
+	count    int
 	height   int
 	y        int // first line of the row within the body
 }
@@ -49,13 +51,15 @@ type row struct {
 // rows inside a branch that can be focused after descending into it.
 func (r row) item() bool {
 	switch r.kind {
-	case rowFile, rowCommit, rowWorkflow, rowCheck:
+	case rowFile, rowGenerated, rowCommit, rowWorkflow, rowCheck:
 		return true
 	}
 	return false
 }
 
 func sectionKey(branch, section string) string { return section + "\x00" + branch }
+
+func generatedKey(branch string) string { return "gen\x00" + branch }
 
 func workflowKey(branch, workflow string) string { return "wf\x00" + branch + "\x00" + workflow }
 
@@ -108,8 +112,13 @@ func (m *Model) buildRows() {
 				},
 			)
 			if m.expanded[sectionKey(b.Name, secFiles)] {
+				gen := 0
 				for fi := range b.Files {
 					f := &b.Files[fi]
+					if f.Generated {
+						gen++
+						continue
+					}
 					add(
 						row{
 							kind:   rowFile,
@@ -118,6 +127,26 @@ func (m *Model) buildRows() {
 							file:   f,
 						},
 					)
+				}
+				if gen > 0 {
+					gk := generatedKey(b.Name)
+					add(row{kind: rowGenerated, key: gk, branch: i, count: gen})
+					if m.expanded[gk] {
+						for fi := range b.Files {
+							f := &b.Files[fi]
+							if !f.Generated {
+								continue
+							}
+							add(
+								row{
+									kind:   rowFile,
+									key:    "file\x00" + b.Name + "\x00" + f.Path,
+									branch: i,
+									file:   f,
+								},
+							)
+						}
+					}
 				}
 			}
 		}

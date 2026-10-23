@@ -46,10 +46,17 @@ func (r *Repo) run(args ...string) (string, error) {
 }
 
 func (r *Repo) output(args ...string) (string, error) {
+	return r.outputStdin("", args...)
+}
+
+func (r *Repo) outputStdin(stdin string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Dir = r.Root
+	if stdin != "" {
+		cmd.Stdin = strings.NewReader(stdin)
+	}
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -143,6 +150,7 @@ type FileChange struct {
 	Additions int
 	Deletions int
 	Binary    bool
+	Generated bool
 }
 
 // Diff lists the files changed between base and head.
@@ -178,7 +186,39 @@ func (r *Repo) Diff(base, head string) ([]FileChange, error) {
 		}
 		files = append(files, f)
 	}
+	r.markGenerated(files)
 	return files, nil
+}
+
+// markGenerated checks .gitattributes for each file and sets Generated on
+// files tagged with linguist-generated, gitlab-generated, or generated.
+func (r *Repo) markGenerated(files []FileChange) {
+	if len(files) == 0 {
+		return
+	}
+	var stdin strings.Builder
+	for _, f := range files {
+		stdin.WriteString(f.Path)
+		stdin.WriteByte(0)
+	}
+	out, err := r.outputStdin(
+		stdin.String(),
+		"check-attr", "-z", "--stdin",
+		"linguist-generated", "gitlab-generated", "generated",
+	)
+	if err != nil {
+		return
+	}
+	gen := map[string]bool{}
+	fields := strings.Split(strings.TrimSuffix(out, "\x00"), "\x00")
+	for i := 0; i+2 < len(fields); i += 3 {
+		if val := fields[i+2]; val == "set" || val == "true" {
+			gen[fields[i]] = true
+		}
+	}
+	for i := range files {
+		files[i].Generated = gen[files[i].Path]
+	}
 }
 
 // Fingerprint returns a cheap summary of the local state that changes whenever

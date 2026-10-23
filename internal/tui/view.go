@@ -304,7 +304,13 @@ func (m Model) renderRow(r row, cursor, active bool) []string {
 		var text, extra string
 		switch r.section {
 		case secFiles:
-			text = plural(len(b.Files), "file changed", "files changed")
+			n := 0
+			for _, f := range b.Files {
+				if !f.Generated {
+					n++
+				}
+			}
+			text = plural(n, "file changed", "files changed")
 		case secCommits:
 			text = plural(len(b.Commits), "commit", "commits")
 		case secChecks:
@@ -320,12 +326,24 @@ func (m Model) renderRow(r row, cursor, active bool) []string {
 
 	case rowFile:
 		f := r.file
+		in := 4
+		if f.Generated {
+			in = 6
+		}
 		path := truncateLeft(f.Path, m.width-30)
 		stat := m.diffStat(f.Additions, f.Deletions)
 		if f.Binary {
 			stat = s.dim.Render("binary")
 		}
-		return []string{line + indent(4) + s.normal.Render(path) + "  " + stat}
+		return []string{line + indent(in) + s.normal.Render(path) + "  " + stat}
+
+	case rowGenerated:
+		glyph := glyphCollapsed
+		if m.expanded[r.key] {
+			glyph = glyphExpanded
+		}
+		text := plural(r.count, "generated file", "generated files")
+		return []string{line + indent(4) + s.dim.Render(glyph+" "+text)}
 
 	case rowCommit:
 		c := r.commit

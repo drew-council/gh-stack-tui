@@ -343,7 +343,7 @@ func (m *Model) expand(enter bool) tea.Cmd {
 			return nil
 		}
 		m.setBranchExpanded(m.snap.Branches[r.branch].Name, true)
-	case rowWorkflow:
+	case rowWorkflow, rowGenerated:
 		m.expanded[r.key] = !m.expanded[r.key]
 	default:
 		if enter {
@@ -355,8 +355,9 @@ func (m *Model) expand(enter bool) tea.Cmd {
 	return nil
 }
 
-// collapse is h. On a branch it closes every section. On a check it closes
-// the workflow and parks on it; on any other item it goes back to the branch.
+// collapse is h. On a branch it closes every section. On a check or generated
+// file it closes the group and parks on it; on any other item it goes back to
+// the branch.
 func (m *Model) collapse() {
 	r, ok := m.hovered()
 	if !ok {
@@ -366,11 +367,27 @@ func (m *Model) collapse() {
 	case rowBranch:
 		m.setBranchExpanded(m.snap.Branches[r.branch].Name, false)
 		m.rebuild()
+	case rowWorkflow, rowGenerated:
+		if m.expanded[r.key] {
+			m.expanded[r.key] = false
+			m.rebuild()
+			return
+		}
+		m.setCursor(m.branchRow(r.branch))
 	case rowCheck:
 		wk := workflowKey(m.snap.Branches[r.branch].Name, r.workflow.Name)
 		m.expanded[wk] = false
 		m.cursorKey = wk
 		m.rebuild()
+	case rowFile:
+		if r.file.Generated {
+			gk := generatedKey(m.snap.Branches[r.branch].Name)
+			m.expanded[gk] = false
+			m.cursorKey = gk
+			m.rebuild()
+			return
+		}
+		m.setCursor(m.branchRow(r.branch))
 	default:
 		m.setCursor(m.branchRow(r.branch))
 	}
@@ -393,7 +410,7 @@ func (m *Model) toggleSection(section string) {
 
 func sectionOf(r row) string {
 	switch r.kind {
-	case rowFile:
+	case rowFile, rowGenerated:
 		return secFiles
 	case rowCommit:
 		return secCommits
