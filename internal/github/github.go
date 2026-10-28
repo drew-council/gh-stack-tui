@@ -90,12 +90,16 @@ func (pr *PR) Review() ReviewStatus {
 	return ReviewReady
 }
 
+// prFields requests one PR. The reviewer lists stop at 25, which is more
+// people than a PR gets in practice; each extra entry costs query weight on
+// every poll. Review threads and check contexts stay at 100 because the UI
+// counts them.
 const prFields = `number url title state isDraft merged reviewDecision mergeStateStatus
   author { login }
   mergeQueueEntry { state }
-  latestOpinionatedReviews(first: 100) { nodes { state } }
-  latestReviews(first: 50) { nodes { author { __typename login } } }
-  reviewRequests(first: 50) { nodes { requestedReviewer {
+  latestOpinionatedReviews(first: 25) { nodes { state } }
+  latestReviews(first: 25) { nodes { author { __typename login } } }
+  reviewRequests(first: 25) { nodes { requestedReviewer {
     __typename ... on User { login } ... on Team { slug } } } }
   suggestedReviewerActors(first: 10) { nodes { reviewer { __typename ... on User { login } } } }
   reviewThreads(first: 100) { nodes { isResolved } }
