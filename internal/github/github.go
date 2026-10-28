@@ -5,11 +5,15 @@ package github
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
+	"net/http"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/cli/go-gh/v2/pkg/api"
 )
 
 // Repo identifies a GitHub repository.
@@ -106,6 +110,27 @@ const prFields = `number url title state isDraft merged reviewDecision mergeStat
 // gives up on large queries, so a long stack is fetched a few PRs at a time.
 const fetchBatchSize = 8
 
+// fetchRetries is how many times a batch is retried after a gateway error.
+const fetchRetries = 2
+
+// retryDelay is the first retry delay; each retry waits twice as long.
+const retryDelay = 500 * time.Millisecond
+
+// transient reports whether err is a gateway failure that may succeed when
+// retried. Rate limits are not transient: waiting them out is the caller's
+// call, not this one's.
+func transient(err error) bool {
+	var httpErr *api.HTTPError
+	if !errors.As(err, &httpErr) {
+		return false
+	}
+	switch httpErr.StatusCode {
+	case http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return true
+	}
+	return false
+}
+
 // FetchPRs returns the PR for each lookup, keyed by branch. Branches with no PR
 // are absent from the result.
 func (c *Client) FetchPRs(ctx context.Context, lookups []Lookup) (map[string]*PR, error) {
@@ -158,10 +183,18 @@ func (c *Client) fetchBatch(ctx context.Context, lookups []Lookup) (map[string]*
 	var data struct {
 		Repository map[string]json.RawMessage `json:"repository"`
 	}
+	err := c.graphQL(ctx, q.String(), vars, &data)
+	for attempt := 1; attempt <= fetchRetries && transient(err); attempt++ {
+		select {
+		case <-ctx.Done():
+			return nil, err
+		case <-time.After(retryDelay << (attempt - 1)):
+		}
+		err = c.graphQL(ctx, q.String(), vars, &data)
+	}
 	// A partial error (for example one PR number that no longer resolves)
 	// still comes with the data for the rest.
-	if err := c.graphQL(ctx, q.String(), vars, &data); err != nil &&
-		(!partial(err) || data.Repository == nil) {
+	if err != nil && (!partial(err) || data.Repository == nil) {
 		return nil, err
 	}
 

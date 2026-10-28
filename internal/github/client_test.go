@@ -12,9 +12,10 @@ import (
 )
 
 // fakeGitHub answers every request with status and body, and records the
-// requests it saw.
+// requests it saw. statuses, when set, is consumed one response at a time.
 type fakeGitHub struct {
 	status   int
+	statuses []int
 	body     string
 	requests []string
 }
@@ -22,8 +23,12 @@ type fakeGitHub struct {
 func (f *fakeGitHub) RoundTrip(req *http.Request) (*http.Response, error) {
 	body, _ := io.ReadAll(req.Body)
 	f.requests = append(f.requests, req.Method+" "+req.URL.Path+" "+string(body))
+	status := f.status
+	if len(f.statuses) > 0 {
+		status, f.statuses = f.statuses[0], f.statuses[1:]
+	}
 	return &http.Response{
-		StatusCode: f.status,
+		StatusCode: status,
 		Header:     http.Header{"Content-Type": {"application/json"}},
 		Body:       io.NopCloser(strings.NewReader(f.body)),
 		Request:    req,
@@ -103,6 +108,30 @@ func TestFetchPRsFailsWithoutData(t *testing.T) {
 	_, err := fakeClient(t, fake).FetchPRs(context.Background(), []Lookup{{Branch: "two"}})
 	if err == nil || !strings.Contains(err.Error(), "Bad credentials") {
 		t.Fatalf("err = %v", err)
+	}
+	if len(fake.requests) != 1 {
+		t.Fatalf("a 401 should not be retried: %d requests", len(fake.requests))
+	}
+}
+
+func TestFetchPRsRetriesGatewayErrors(t *testing.T) {
+	fake := &fakeGitHub{
+		status:   200,
+		statuses: []int{502},
+		body:     `{"data": {"repository": {"b0": {"number": 2}}}}`,
+	}
+	prs, err := fakeClient(
+		t,
+		fake,
+	).FetchPRs(context.Background(), []Lookup{{Branch: "two", Number: 2}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.requests) != 2 {
+		t.Fatalf("requests = %d, want 2", len(fake.requests))
+	}
+	if prs["two"] == nil {
+		t.Fatalf("prs = %+v", prs)
 	}
 }
 
