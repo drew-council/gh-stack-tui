@@ -123,6 +123,26 @@ func TestFetchPRsFailsWhenAnyBatchFails(t *testing.T) {
 	}
 }
 
+func TestFetchSuggestedSkipsAuthor(t *testing.T) {
+	fake := &fakeGitHub{status: 200, body: `{"data": {"repository": {
+		"s0": {"author": {"login": "me"}, "suggestedReviewerActors": {"nodes": [
+			{"reviewer": {"__typename": "User", "login": "yuki"}},
+			{"reviewer": {"__typename": "User", "login": "me"}},
+			{"reviewer": {"__typename": "Bot", "login": "copilot"}},
+			{"reviewer": {"__typename": "User", "login": "amy"}}
+		]}},
+		"s1": {"author": {"login": "me"}, "suggestedReviewerActors": {"nodes": []}},
+		"s2": null
+	}}}`}
+	got, err := fakeClient(t, fake).FetchSuggested(context.Background(), []int{2, 3, 9})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fmt.Sprint(got) != "map[2:[yuki amy] 3:[]]" {
+		t.Fatalf("suggested = %v", got)
+	}
+}
+
 func TestFetchPRsFailsWithoutData(t *testing.T) {
 	fake := &fakeGitHub{status: 401, body: `{"message": "Bad credentials"}`}
 	_, err := fakeClient(t, fake).FetchPRs(context.Background(), []Lookup{{Branch: "two"}})

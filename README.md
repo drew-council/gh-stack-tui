@@ -60,7 +60,7 @@ Stack operations follow the aliases of the `gs` wrapper: `p` push, `s` sync, `P`
 
 When `D` marks a draft ready and nobody has been asked to review it in person (at most teams, such as the CODEOWNERS teams GitHub requests on its own), a picker asks who should review it first. Type to fuzzy filter by login or name, `tab` picks several people, and `enter` requests the picked people, or the hovered one if nobody is picked, then marks the PR ready. `ctrl+s` marks it ready without asking anyone, and `esc` leaves it a draft.
 
-The list puts GitHub's suggested reviewers for the PR first. Next come the people your last 50 PRs in the repository went to, most often first. Everyone else follows by login. The candidates load once in the background after the first GitHub refresh, so the picker opens instantly.
+The list puts GitHub's suggested reviewers for the PR first. Next come the people your last 50 PRs in the repository went to, most often first. Everyone else follows by login. The candidates load once in the background after the first GitHub refresh, so the picker opens instantly. GitHub's suggestions load in the background for drafts that need reviewers, and load again when a draft's head commit changes.
 
 ## Development
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -34,7 +35,20 @@ type (
 		reviewers []github.Reviewer
 		err       error
 	}
+
+	suggestedLoadedMsg struct {
+		// heads are the head commits the suggestions were requested for.
+		heads  map[int]string
+		logins map[int][]string
+		err    error
+	}
 )
+
+// suggestion is GitHub's reviewer suggestions for a PR at one head commit.
+type suggestion struct {
+	head   string
+	logins []string
+}
 
 func pollTick(d time.Duration) tea.Cmd {
 	return tea.Tick(d, func(time.Time) tea.Msg { return pollTickMsg{} })
@@ -251,7 +265,7 @@ func (m Model) applyRemote(msg remoteLoadedMsg) (tea.Model, tea.Cmd) {
 	m.buildRows()
 	m.restoreCursor(fallback)
 	m.ensureVisible()
-	return m, tea.Batch(cmd, m.requestReviewers())
+	return m, tea.Batch(cmd, m.requestReviewers(), m.requestSuggested())
 }
 
 // requestReviewers loads the people who can review PRs in the background,
@@ -278,6 +292,71 @@ func (m Model) applyReviewers(msg reviewersLoadedMsg) Model {
 	}
 	if m.picker != nil {
 		m.picker.setCandidates(m.reviewers)
+		m.ensurePickerVisible()
 	}
 	return m
+}
+
+// requestSuggested loads GitHub's reviewer suggestions in the background for
+// the drafts that would open the reviewer picker. They are slow for GitHub to
+// compute, so they are fetched once per head commit rather than every poll.
+func (m *Model) requestSuggested() tea.Cmd {
+	if m.loadingSuggested || m.gh == nil {
+		return nil
+	}
+	heads := map[int]string{}
+	var numbers []int
+	for _, pr := range m.prs {
+		if pr.State != "OPEN" || !needsReviewers(pr) {
+			continue
+		}
+		if s, ok := m.suggested[pr.Number]; ok && s.head == pr.HeadSHA {
+			continue
+		}
+		heads[pr.Number] = pr.HeadSHA
+		numbers = append(numbers, pr.Number)
+	}
+	if len(numbers) == 0 {
+		return nil
+	}
+	m.loadingSuggested = true
+	client := m.gh
+	return func() tea.Msg {
+		logins, err := client.FetchSuggested(context.Background(), numbers)
+		return suggestedLoadedMsg{heads: heads, logins: logins, err: err}
+	}
+}
+
+// applySuggested records suggestions, and reranks the open picker. A failed
+// load is retried after the next remote load.
+func (m Model) applySuggested(msg suggestedLoadedMsg) Model {
+	m.loadingSuggested = false
+	if msg.err != nil {
+		return m
+	}
+	if m.suggested == nil {
+		m.suggested = map[int]suggestion{}
+	}
+	for n, head := range msg.heads {
+		m.suggested[n] = suggestion{head: head, logins: msg.logins[n]}
+	}
+	if m.picker != nil {
+		m.picker.suggested = m.suggestionsFor(m.picker.need)
+		m.picker.setCandidates(m.reviewers)
+		m.ensurePickerVisible()
+	}
+	return m
+}
+
+// suggestionsFor merges the suggestions for PR numbers, in order.
+func (m *Model) suggestionsFor(numbers []int) []string {
+	var logins []string
+	for _, n := range numbers {
+		for _, login := range m.suggested[n].logins {
+			if !slices.Contains(logins, login) {
+				logins = append(logins, login)
+			}
+		}
+	}
+	return logins
 }

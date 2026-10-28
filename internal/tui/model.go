@@ -69,6 +69,10 @@ type Model struct {
 	reviewersLoaded  bool
 	loadingReviewers bool
 	reviewersErr     error
+	// suggested are GitHub's reviewer suggestions by PR number, loaded in the
+	// background for drafts that need reviewers.
+	suggested        map[int]suggestion
+	loadingSuggested bool
 
 	st styles
 
@@ -199,6 +203,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case reviewersLoadedMsg:
 		return m.applyReviewers(msg), nil
+
+	case suggestedLoadedMsg:
+		return m.applySuggested(msg), nil
 
 	case reviewersRequestedMsg:
 		if msg.err != nil {

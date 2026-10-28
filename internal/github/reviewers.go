@@ -3,6 +3,8 @@ package github
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -143,4 +145,64 @@ func (c *Client) FetchReviewers(ctx context.Context) ([]Reviewer, error) {
 		}
 	}
 	return reviewers, nil
+}
+
+// FetchSuggested returns GitHub's reviewer suggestions for each PR number,
+// best first and without the PR's author. PRs that no longer resolve are
+// absent from the result.
+func (c *Client) FetchSuggested(ctx context.Context, numbers []int) (map[int][]string, error) {
+	out := map[int][]string{}
+	var mu sync.Mutex
+	err := inBatches(ctx, len(numbers), func(ctx context.Context, lo, hi int) error {
+		batch := numbers[lo:hi]
+		var q strings.Builder
+		q.WriteString(
+			"query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) {\n",
+		)
+		for i, n := range batch {
+			fmt.Fprintf(&q, `s%d: pullRequest(number: %d) { author { login }
+  suggestedReviewerActors(first: 10) { nodes { reviewer { __typename ... on User { login } } } } }
+`, i, n)
+		}
+		q.WriteString("} }")
+		var data struct {
+			Repository map[string]*struct {
+				Author                  *actor `json:"author"`
+				SuggestedReviewerActors struct {
+					Nodes []struct {
+						Reviewer *actor `json:"reviewer"`
+					} `json:"nodes"`
+				} `json:"suggestedReviewerActors"`
+			} `json:"repository"`
+		}
+		vars := map[string]any{"owner": c.Repo.Owner, "name": c.Repo.Name}
+		err := c.graphQLRetry(ctx, q.String(), vars, &data)
+		if err != nil && (!partial(err) || data.Repository == nil) {
+			return err
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		for i, n := range batch {
+			node := data.Repository[fmt.Sprintf("s%d", i)]
+			if node == nil {
+				continue
+			}
+			author := ""
+			if node.Author != nil {
+				author = node.Author.Login
+			}
+			logins := []string{}
+			for _, s := range node.SuggestedReviewerActors.Nodes {
+				if login := s.Reviewer.user(); login != "" && login != author {
+					logins = append(logins, login)
+				}
+			}
+			out[n] = logins
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }

@@ -56,8 +56,6 @@ type PR struct {
 	// such as CODEOWNERS teams.
 	Reviewers      []string
 	RequestedTeams []string
-	// Suggested are GitHub's reviewer suggestions for the PR, best first.
-	Suggested []string
 }
 
 // NeedsReviewers reports whether nobody has been asked to review the PR in
@@ -94,7 +92,8 @@ func (pr *PR) Review() ReviewStatus {
 // prFields requests one PR. The reviewer lists stop at 25, which is more
 // people than a PR gets in practice; each extra entry costs query weight on
 // every poll. Review threads and check contexts stay at 100 because the UI
-// counts them.
+// counts them. Suggested reviewers are slow for GitHub to compute, so
+// [Client.FetchSuggested] asks for them separately.
 const prFields = `number url title state isDraft merged reviewDecision mergeStateStatus
   author { login }
   mergeQueueEntry { state }
@@ -102,7 +101,6 @@ const prFields = `number url title state isDraft merged reviewDecision mergeStat
   latestReviews(first: 25) { nodes { author { __typename login } } }
   reviewRequests(first: 25) { nodes { requestedReviewer {
     __typename ... on User { login } ... on Team { slug } } } }
-  suggestedReviewerActors(first: 10) { nodes { reviewer { __typename ... on User { login } } } }
   reviewThreads(first: 100) { nodes { isResolved } }
   commits(last: 1) { nodes { commit { oid statusCheckRollup { state contexts(first: 100) { nodes {
     __typename
@@ -198,6 +196,28 @@ func inBatches(
 	return first
 }
 
+// graphQLRetry runs query like [Client.graphQL], with a timeout, and retries
+// it after a gateway error.
+func (c *Client) graphQLRetry(
+	ctx context.Context,
+	query string,
+	vars map[string]any,
+	out any,
+) error {
+	ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
+	defer cancel()
+	err := c.graphQL(ctx, query, vars, out)
+	for attempt := 1; attempt <= fetchRetries && transient(err); attempt++ {
+		select {
+		case <-ctx.Done():
+			return err
+		case <-time.After(retryDelay << (attempt - 1)):
+		}
+		err = c.graphQL(ctx, query, vars, out)
+	}
+	return err
+}
+
 // fetchBatch fetches the PRs for one batch of lookups.
 func (c *Client) fetchBatch(ctx context.Context, lookups []Lookup) (map[string]*PR, error) {
 	var q strings.Builder
@@ -230,20 +250,10 @@ func (c *Client) fetchBatch(ctx context.Context, lookups []Lookup) (map[string]*
 	}
 	q.WriteString("} }")
 
-	ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
-	defer cancel()
 	var data struct {
 		Repository map[string]json.RawMessage `json:"repository"`
 	}
-	err := c.graphQL(ctx, q.String(), vars, &data)
-	for attempt := 1; attempt <= fetchRetries && transient(err); attempt++ {
-		select {
-		case <-ctx.Done():
-			return nil, err
-		case <-time.After(retryDelay << (attempt - 1)):
-		}
-		err = c.graphQL(ctx, q.String(), vars, &data)
-	}
+	err := c.graphQLRetry(ctx, q.String(), vars, &data)
 	// A partial error (for example one PR number that no longer resolves)
 	// still comes with the data for the rest.
 	if err != nil && (!partial(err) || data.Repository == nil) {
@@ -309,11 +319,6 @@ type prNode struct {
 			RequestedReviewer *actor `json:"requestedReviewer"`
 		} `json:"nodes"`
 	} `json:"reviewRequests"`
-	SuggestedReviewerActors struct {
-		Nodes []struct {
-			Reviewer *actor `json:"reviewer"`
-		} `json:"nodes"`
-	} `json:"suggestedReviewerActors"`
 	LatestOpinionatedReviews struct {
 		Nodes []struct {
 			State string `json:"state"`
@@ -425,11 +430,6 @@ func (n *prNode) toPR() *PR {
 	}
 	for _, r := range n.LatestReviews.Nodes {
 		addReviewer(r.Author.user())
-	}
-	for _, s := range n.SuggestedReviewerActors.Nodes {
-		if login := s.Reviewer.user(); login != "" && login != author {
-			pr.Suggested = append(pr.Suggested, login)
-		}
 	}
 	if len(n.Commits.Nodes) > 0 {
 		c := n.Commits.Nodes[0].Commit

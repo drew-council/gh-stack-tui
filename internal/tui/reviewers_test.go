@@ -78,7 +78,7 @@ func draftModel(t *testing.T, fake *fakeGitHub) Model {
 	pr := m.prs["two"]
 	pr.IsDraft = true
 	pr.RequestedTeams = []string{"go-readability"}
-	pr.Suggested = []string{"yuki"}
+	m.suggested = map[int]suggestion{2: {head: pr.HeadSHA, logins: []string{"yuki"}}}
 	m.reviewers = []github.Reviewer{
 		{Login: "amy", Name: "Amy Adams"},
 		{Login: "mbhatg", RecentPRs: 38, Recent: 12.8},
@@ -184,6 +184,34 @@ func TestReadyWithOnlyTeamsOpensReviewerPicker(t *testing.T) {
 	if op.title != "ready #2 → mbhatg, zachsheer" ||
 		op.name+" "+strings.Join(op.args, " ") != "gh pr ready 2" {
 		t.Fatalf("op = %+v", op)
+	}
+}
+
+func TestSuggestionsRerankOpenPicker(t *testing.T) {
+	m := draftModel(t, &fakeGitHub{status: 201})
+	m.suggested = nil
+	m = press(m, "D")
+	if !m.loadingSuggested {
+		t.Fatal("opening the picker without suggestions should load them")
+	}
+	if got := strings.Join(shown(m), " "); got != "mbhatg zachsheer amy bob yuki" {
+		t.Fatalf("order = %s", got)
+	}
+	m = keys(m, keyDown)
+
+	next, _ := m.Update(suggestedLoadedMsg{
+		heads:  map[int]string{2: m.prs["two"].HeadSHA},
+		logins: map[int][]string{2: {"yuki"}},
+	})
+	m = next.(Model)
+	if got := strings.Join(shown(m), " "); got != "yuki mbhatg zachsheer amy bob" {
+		t.Fatalf("order = %s", got)
+	}
+	if c, _ := m.picker.hovered(); c.Login != "zachsheer" {
+		t.Fatalf("hovered = %s, want zachsheer to stay hovered", c.Login)
+	}
+	if m.requestSuggested() != nil {
+		t.Fatal("suggestions for an unchanged head should not be fetched again")
 	}
 }
 

@@ -71,12 +71,8 @@ func (m *Model) openPicker(drafts []*github.PR, need []*github.PR) tea.Cmd {
 				teams = append(teams, t)
 			}
 		}
-		for _, login := range pr.Suggested {
-			if !slices.Contains(p.suggested, login) {
-				p.suggested = append(p.suggested, login)
-			}
-		}
 	}
+	p.suggested = m.suggestionsFor(p.need)
 	p.subject = strings.Join(numbers, ", ")
 	if len(need) == 1 && need[0].Title != "" {
 		p.subject += " " + need[0].Title
@@ -95,7 +91,9 @@ func (m *Model) openPicker(drafts []*github.PR, need []*github.PR) tea.Cmd {
 	m.mode = modeReviewers
 	m.input.SetValue("")
 	m.input.Placeholder = "type to filter"
-	return m.input.Focus()
+	// Suggestions still missing (a failed load, or a draft that just
+	// appeared) rerank the picker when they arrive.
+	return tea.Batch(m.input.Focus(), m.requestSuggested())
 }
 
 func (m *Model) closePicker() {
@@ -108,8 +106,9 @@ func (m *Model) closePicker() {
 // setCandidates ranks reviewers the way GitHub's reviewer menu does: its
 // suggestions for the PR first, then the people the viewer's recent PRs went
 // to, most often first and most lately among equals, then everyone else by
-// login.
+// login. The hovered candidate stays hovered.
 func (p *pickerState) setCandidates(reviewers []github.Reviewer) {
+	hovered, wasHovered := p.hovered()
 	p.all = p.all[:0]
 	for _, r := range reviewers {
 		p.all = append(
@@ -145,6 +144,14 @@ func (p *pickerState) setCandidates(reviewers []github.Reviewer) {
 		return strings.ToLower(a.Login) < strings.ToLower(b.Login)
 	})
 	p.filter(p.query)
+	if wasHovered {
+		if i := slices.IndexFunc(
+			p.shown,
+			func(c candidate) bool { return c.Login == hovered.Login },
+		); i >= 0 {
+			p.cursor = i
+		}
+	}
 }
 
 // filter shows the candidates matching query, best match first and in rank
