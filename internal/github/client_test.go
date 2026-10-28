@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/cli/go-gh/v2/pkg/api"
@@ -14,6 +15,7 @@ import (
 // fakeGitHub answers every request with status and body, and records the
 // requests it saw. statuses, when set, is consumed one response at a time.
 type fakeGitHub struct {
+	mu       sync.Mutex
 	status   int
 	statuses []int
 	body     string
@@ -22,6 +24,8 @@ type fakeGitHub struct {
 
 func (f *fakeGitHub) RoundTrip(req *http.Request) (*http.Response, error) {
 	body, _ := io.ReadAll(req.Body)
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.requests = append(f.requests, req.Method+" "+req.URL.Path+" "+string(body))
 	status := f.status
 	if len(f.statuses) > 0 {
@@ -100,6 +104,22 @@ func TestFetchPRsSplitsLongStacks(t *testing.T) {
 	}
 	if len(prs) != 2 {
 		t.Fatalf("prs = %+v", prs)
+	}
+}
+
+func TestFetchPRsFailsWhenAnyBatchFails(t *testing.T) {
+	fake := &fakeGitHub{
+		status:   200,
+		statuses: []int{401},
+		body:     `{"data": {"repository": {"b0": {"number": 2}}}}`,
+	}
+	lookups := make([]Lookup, fetchBatchSize*3)
+	for i := range lookups {
+		lookups[i] = Lookup{Branch: fmt.Sprintf("b%d", i), Number: i + 1}
+	}
+	prs, err := fakeClient(t, fake).FetchPRs(context.Background(), lookups)
+	if err == nil || prs != nil {
+		t.Fatalf("prs %+v err %v, want an error", prs, err)
 	}
 }
 

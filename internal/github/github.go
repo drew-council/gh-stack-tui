@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cli/go-gh/v2/pkg/api"
@@ -111,8 +112,14 @@ const prFields = `number url title state isDraft merged reviewDecision mergeStat
   } } } } } }`
 
 // fetchBatchSize is the most PRs fetched in one request. GitHub's gateway
-// gives up on large queries, so a long stack is fetched a few PRs at a time.
-const fetchBatchSize = 8
+// gives up on large queries, and GitHub answers several small queries at
+// once faster than one large one, so a long stack is fetched a few PRs at a
+// time.
+const fetchBatchSize = 4
+
+// fetchConcurrency is the most batches in flight at once, well under
+// GitHub's limit of 100 concurrent requests.
+const fetchConcurrency = 6
 
 // fetchRetries is how many times a batch is retried after a gateway error.
 const fetchRetries = 2
@@ -139,15 +146,56 @@ func transient(err error) bool {
 // are absent from the result.
 func (c *Client) FetchPRs(ctx context.Context, lookups []Lookup) (map[string]*PR, error) {
 	out := map[string]*PR{}
-	for start := 0; start < len(lookups); start += fetchBatchSize {
-		batch := lookups[start:min(start+fetchBatchSize, len(lookups))]
-		prs, err := c.fetchBatch(ctx, batch)
+	var mu sync.Mutex
+	err := inBatches(ctx, len(lookups), func(ctx context.Context, lo, hi int) error {
+		prs, err := c.fetchBatch(ctx, lookups[lo:hi])
 		if err != nil {
-			return nil, err
+			return err
 		}
+		mu.Lock()
 		maps.Copy(out, prs)
+		mu.Unlock()
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	return out, nil
+}
+
+// inBatches splits n items into batches of fetchBatchSize and calls fetch on
+// each, fetchConcurrency at a time. The first error cancels the rest and is
+// returned.
+func inBatches(
+	ctx context.Context,
+	n int,
+	fetch func(ctx context.Context, lo, hi int) error,
+) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	var wg sync.WaitGroup
+	var once sync.Once
+	var first error
+	sem := make(chan struct{}, fetchConcurrency)
+	for lo := 0; lo < n; lo += fetchBatchSize {
+		hi := min(lo+fetchBatchSize, n)
+		wg.Go(func() {
+			select {
+			case sem <- struct{}{}:
+			case <-ctx.Done():
+				return
+			}
+			defer func() { <-sem }()
+			if err := fetch(ctx, lo, hi); err != nil {
+				once.Do(func() {
+					first = err
+					cancel()
+				})
+			}
+		})
+	}
+	wg.Wait()
+	return first
 }
 
 // fetchBatch fetches the PRs for one batch of lookups.
