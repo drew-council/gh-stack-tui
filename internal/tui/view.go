@@ -154,6 +154,11 @@ func (m Model) headerLines() []string {
 	switch {
 	case m.loadingRemote:
 		right = m.spinner.View() + s.dim.Render(" refreshing")
+		if !m.cachedAt.IsZero() {
+			right += s.dim.Render(" · cached " + shortAgo(m.cachedAt))
+		}
+	case !m.cachedAt.IsZero():
+		right = s.dim.Render("cached " + shortAgo(m.cachedAt))
 	case !m.lastRemote.IsZero():
 		right = s.dim.Render("↻ " + shortAgo(m.lastRemote))
 	}

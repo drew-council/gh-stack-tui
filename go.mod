@@ -10,6 +10,7 @@ require (
 	github.com/charmbracelet/x/ansi v0.11.8
 	github.com/cli/go-gh/v2 v2.16.2
 	github.com/github/gh-stack/shim/ghstack v0.0.0-00010101000000-000000000000
+	github.com/mattn/go-sqlite3 v1.14.52
 )
 
 require (

@@ -8,6 +8,7 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/drew-council/gh-stack-tui/internal/cache"
 	"github.com/drew-council/gh-stack-tui/internal/git"
 	"github.com/drew-council/gh-stack-tui/internal/github"
 	"github.com/drew-council/gh-stack-tui/internal/stack"
@@ -28,6 +29,10 @@ type Options struct {
 	ReviewPRCmd string
 	// ReviewIn picks where the review opens: auto, herdr, tmux, or inline.
 	ReviewIn string
+	// Cache, when set, shows the last known GitHub state at startup and
+	// keeps the reviewer list between runs. CacheErr is why it is not set.
+	Cache    *cache.Cache
+	CacheErr error
 }
 
 type mode int
@@ -52,9 +57,12 @@ type Model struct {
 	pinned        string
 	pinnedCurrent string
 
-	localErr      error
-	remoteErr     error
-	lastRemote    time.Time
+	localErr   error
+	remoteErr  error
+	lastRemote time.Time
+	// cachedAt is when the oldest of prs was fetched while they come from
+	// the cache, and zero once GitHub has answered.
+	cachedAt      time.Time
 	loadingLocal  bool
 	reloadLocal   bool
 	loadingRemote bool
@@ -64,9 +72,11 @@ type Model struct {
 	gh *github.Client
 
 	// reviewers are the people who can review PRs in the repository, loaded
-	// once in the background after the first remote load.
+	// in the background after the first remote load, or from the cache.
+	// reviewersAt is when they were fetched.
 	reviewers        []github.Reviewer
 	reviewersLoaded  bool
+	reviewersAt      time.Time
 	loadingReviewers bool
 	reviewersErr     error
 	// suggested are GitHub's reviewer suggestions by PR number, loaded in the
@@ -132,12 +142,18 @@ func New(repo *git.Repo, opts Options) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(
+	cmds := []tea.Cmd{
 		m.loadLocal(),
 		m.spinner.Tick,
 		pollTick(m.opts.PollInterval),
 		remoteTick(m.opts.RemoteInterval),
-	)
+	}
+	if err := m.opts.CacheErr; err != nil {
+		cmds = append(cmds, func() tea.Msg {
+			return flashMsg{text: "cache: " + firstLine(err.Error()), err: true}
+		})
+	}
+	return tea.Batch(cmds...)
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -201,11 +217,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case remoteLoadedMsg:
 		return m.applyRemote(msg)
 
+	case cachedLoadedMsg:
+		return m.applyCached(msg), nil
+
 	case reviewersLoadedMsg:
-		return m.applyReviewers(msg), nil
+		return m.applyReviewers(msg)
 
 	case suggestedLoadedMsg:
-		return m.applySuggested(msg), nil
+		return m.applySuggested(msg)
 
 	case reviewersRequestedMsg:
 		if msg.err != nil {

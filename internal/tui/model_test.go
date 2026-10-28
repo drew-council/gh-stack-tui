@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -487,4 +488,39 @@ func TestGeneratedFilesGroupedAndCollapsible(t *testing.T) {
 	}
 	m = press(m, "h")
 	onBranch(t, m, "two")
+}
+
+func TestCachedPRsShowUntilGitHubAnswers(t *testing.T) {
+	m := testModel()
+	live := m.prs
+	m.prs = map[string]*github.PR{}
+	m.loadingRemote = true
+	at := time.Now().Add(-5 * time.Minute)
+	next, _ := m.Update(cachedLoadedMsg{
+		stack: m.snap.Key,
+		prs:   map[string]*github.PR{"two": {Number: 2, State: "OPEN", Title: "Cached title"}},
+		at:    at,
+	})
+	m = next.(Model)
+	header := ansi.Strip(strings.Join(m.headerLines(), "\n"))
+	if m.prs["two"].Title != "Cached title" || !strings.Contains(header, "cached 5m ago") {
+		t.Fatalf("cached PRs should show, header %q", header)
+	}
+
+	next, _ = m.Update(remoteLoadedMsg{prs: live, at: time.Now()})
+	m = next.(Model)
+	header = ansi.Strip(strings.Join(m.headerLines(), "\n"))
+	if m.prs["two"].Title != "Second layer" || strings.Contains(header, "cached") {
+		t.Fatalf("GitHub's answer should replace the cache, header %q", header)
+	}
+
+	// A cache read that finishes after GitHub answered changes nothing.
+	next, _ = m.Update(cachedLoadedMsg{
+		stack: m.snap.Key,
+		prs:   map[string]*github.PR{"two": {Number: 2, Title: "Cached title"}},
+		at:    at,
+	})
+	if m = next.(Model); m.prs["two"].Title != "Second layer" {
+		t.Fatal("a late cache read should not replace live PRs")
+	}
 }

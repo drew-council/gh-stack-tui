@@ -62,12 +62,18 @@ When `D` marks a draft ready and nobody has been asked to review it in person (a
 
 The list puts GitHub's suggested reviewers for the PR first. Next come the people your last 50 PRs in the repository went to, most often first. Everyone else follows by login. The candidates load once in the background after the first GitHub refresh, so the picker opens instantly. GitHub's suggestions load in the background for drafts that need reviewers, and load again when a draft's head commit changes.
 
+### Cache
+
+GitHub results are kept in a SQLite database under the user cache directory (`~/.cache/gh-stack-tui` on Linux), shared by every running TUI. At startup the TUI shows the cached PRs, with `cached 5m ago` in the header, until GitHub answers. The reviewer list is reused for 24 hours. Rows unused for 30 days are deleted, and a build that changes what is stored starts a new cache file.
+
 ## Development
 
 ```sh
 go run .
 go test ./...
 ```
+
+The cache's queries are in `internal/cache/queries.sql` and its schema in `internal/cache/schema.sql`. Run `sqlc generate` after changing either; `nix flake check` fails when the generated code is out of date.
 
 This project uses Nix and direnv for a reproducible development environment.
 

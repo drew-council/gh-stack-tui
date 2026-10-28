@@ -37,7 +37,8 @@
   };
 
   settings = {
-    excludes = [ ];
+    # sqlc output; the sqlc flake check compares it with what sqlc generates.
+    excludes = [ "internal/cache/cachedb/*" ];
     formatter = { };
   };
 }

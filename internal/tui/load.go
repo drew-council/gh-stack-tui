@@ -10,6 +10,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/drew-council/gh-stack-tui/internal/cache"
 	"github.com/drew-council/gh-stack-tui/internal/github"
 	"github.com/drew-council/gh-stack-tui/internal/stack"
 )
@@ -28,11 +29,24 @@ type (
 	remoteLoadedMsg struct {
 		client *github.Client
 		prs    map[string]*github.PR
+		at     time.Time
 		err    error
+	}
+
+	// cachedLoadedMsg is what the cache knew about a stack's PRs when the
+	// stack was shown.
+	cachedLoadedMsg struct {
+		stack       string
+		prs         map[string]*github.PR
+		at          time.Time
+		suggested   map[int]cache.Suggestion
+		reviewers   []github.Reviewer
+		reviewersAt time.Time
 	}
 
 	reviewersLoadedMsg struct {
 		reviewers []github.Reviewer
+		at        time.Time
 		err       error
 	}
 
@@ -40,6 +54,7 @@ type (
 		// heads are the head commits the suggestions were requested for.
 		heads  map[int]string
 		logins map[int][]string
+		at     time.Time
 		err    error
 	}
 )
@@ -174,10 +189,115 @@ func (m Model) applyLocal(msg localLoadedMsg) (tea.Model, tea.Cmd) {
 	m.restoreCursor(fallback)
 	m.ensureVisible()
 
+	if stackChanged {
+		cmds = append(cmds, m.loadCached())
+	}
 	if lookupsChanged {
 		cmds = append(cmds, m.requestRemote())
 	}
 	return m, tea.Batch(cmds...)
+}
+
+// lookups lists the PRs a snapshot needs.
+func lookups(s *stack.Snapshot) []github.Lookup {
+	var out []github.Lookup
+	for _, b := range s.Branches {
+		l := github.Lookup{Branch: b.Name}
+		if b.PR != nil {
+			l.Number = b.PR.Number
+		}
+		out = append(out, l)
+	}
+	return out
+}
+
+// loadCached reads what the cache knows about the shown stack, to show while
+// GitHub is asked. Cache errors are ignored: GitHub is asked regardless.
+func (m *Model) loadCached() tea.Cmd {
+	if m.opts.Cache == nil || m.snap == nil || len(m.snap.Branches) == 0 {
+		return nil
+	}
+	c := m.opts.Cache
+	key := m.snap.Key
+	repository := m.snap.Repository
+	ls := lookups(m.snap)
+	var known *github.Repo
+	if m.gh != nil {
+		known = &m.gh.Repo
+	}
+	return func() tea.Msg {
+		var repo github.Repo
+		if known != nil {
+			repo = *known
+		} else {
+			var err error
+			if repo, err = resolveRepo(repository); err != nil {
+				return nil
+			}
+		}
+		msg := cachedLoadedMsg{stack: key}
+		msg.prs, msg.at, _ = c.PRs(repo, ls)
+		var numbers []int
+		for _, pr := range msg.prs {
+			numbers = append(numbers, pr.Number)
+		}
+		msg.suggested, _ = c.Suggested(repo, numbers)
+		msg.reviewers, msg.reviewersAt, _ = c.Reviewers(repo)
+		return msg
+	}
+}
+
+// applyCached shows cached PRs until GitHub answers, and takes cached
+// suggestions and reviewers that are newer than what the TUI has.
+func (m Model) applyCached(msg cachedLoadedMsg) Model {
+	if m.snap == nil || m.snap.Key != msg.stack {
+		return m
+	}
+	for n, s := range msg.suggested {
+		if _, ok := m.suggested[n]; !ok {
+			if m.suggested == nil {
+				m.suggested = map[int]suggestion{}
+			}
+			m.suggested[n] = suggestion{head: s.Head, logins: s.Logins}
+		}
+	}
+	if msg.reviewers != nil && msg.reviewersAt.After(m.reviewersAt) {
+		m.reviewers = msg.reviewers
+		m.reviewersAt = msg.reviewersAt
+		m.reviewersLoaded = true
+	}
+	if m.picker != nil {
+		m.picker.suggested = m.suggestionsFor(m.picker.need)
+		m.picker.setCandidates(m.reviewers)
+		m.ensurePickerVisible()
+	}
+	// GitHub answering first leaves nothing for the cache to fill in.
+	if len(msg.prs) == 0 || len(m.prs) > 0 {
+		return m
+	}
+	m.prs = msg.prs
+	m.cachedAt = msg.at
+	fallback := ""
+	if bi := m.hoveredBranch(); bi >= 0 {
+		fallback = m.snap.Branches[bi].Name
+	}
+	m.buildRows()
+	m.restoreCursor(fallback)
+	m.ensureVisible()
+	return m
+}
+
+// save writes to the cache in the background, once the repository is known.
+// The cache is best effort, so failures are dropped.
+func (m *Model) save(write func(c *cache.Cache, repo github.Repo) error) tea.Cmd {
+	if m.opts.Cache == nil || m.gh == nil {
+		return nil
+	}
+	c, repo := m.opts.Cache, m.gh.Repo
+	return func() tea.Msg {
+		_ = write(c, repo)
+		return nil
+	}
 }
 
 // lookupKey summarizes which PRs a snapshot needs, to refetch when it changes.
@@ -204,14 +324,7 @@ func (m *Model) requestRemote() tea.Cmd {
 	m.loadingRemote = true
 	client := m.gh
 	repository := m.snap.Repository
-	var lookups []github.Lookup
-	for _, b := range m.snap.Branches {
-		l := github.Lookup{Branch: b.Name}
-		if b.PR != nil {
-			l.Number = b.PR.Number
-		}
-		lookups = append(lookups, l)
-	}
+	ls := lookups(m.snap)
 	return func() tea.Msg {
 		if client == nil {
 			repo, err := resolveRepo(repository)
@@ -222,8 +335,9 @@ func (m *Model) requestRemote() tea.Cmd {
 				return remoteLoadedMsg{err: err}
 			}
 		}
-		prs, err := client.FetchPRs(context.Background(), lookups)
-		return remoteLoadedMsg{client: client, prs: prs, err: err}
+		at := time.Now()
+		prs, err := client.FetchPRs(context.Background(), ls)
+		return remoteLoadedMsg{client: client, prs: prs, at: at, err: err}
 	}
 }
 
@@ -258,6 +372,7 @@ func (m Model) applyRemote(msg remoteLoadedMsg) (tea.Model, tea.Cmd) {
 	}
 	m.prs = msg.prs
 	m.lastRemote = time.Now()
+	m.cachedAt = time.Time{}
 	fallback := ""
 	if bi := m.hoveredBranch(); bi >= 0 {
 		fallback = m.snap.Branches[bi].Name
@@ -265,36 +380,53 @@ func (m Model) applyRemote(msg remoteLoadedMsg) (tea.Model, tea.Cmd) {
 	m.buildRows()
 	m.restoreCursor(fallback)
 	m.ensureVisible()
-	return m, tea.Batch(cmd, m.requestReviewers(), m.requestSuggested())
+	prs, at := msg.prs, msg.at
+	return m, tea.Batch(
+		cmd,
+		m.requestReviewers(),
+		m.requestSuggested(),
+		m.save(func(c *cache.Cache, repo github.Repo) error { return c.SavePRs(repo, prs, at) }),
+	)
 }
 
+// reviewersMaxAge is how long a reviewer list is used before it is fetched
+// again. People rarely join or leave a repository.
+const reviewersMaxAge = 24 * time.Hour
+
 // requestReviewers loads the people who can review PRs in the background,
-// once the repository is known. The list does not change while the TUI
-// runs, so it is fetched once and retried only after a failure.
+// once the repository is known, unless a list fetched within
+// reviewersMaxAge is loaded. A failure is retried after the next remote load.
 func (m *Model) requestReviewers() tea.Cmd {
-	if m.reviewersLoaded || m.loadingReviewers || m.gh == nil {
+	if m.loadingReviewers || m.gh == nil ||
+		(m.reviewersLoaded && time.Since(m.reviewersAt) < reviewersMaxAge) {
 		return nil
 	}
 	m.loadingReviewers = true
 	client := m.gh
 	return func() tea.Msg {
+		at := time.Now()
 		reviewers, err := client.FetchReviewers(context.Background())
-		return reviewersLoadedMsg{reviewers: reviewers, err: err}
+		return reviewersLoadedMsg{reviewers: reviewers, at: at, err: err}
 	}
 }
 
-func (m Model) applyReviewers(msg reviewersLoadedMsg) Model {
+func (m Model) applyReviewers(msg reviewersLoadedMsg) (Model, tea.Cmd) {
 	m.loadingReviewers = false
 	m.reviewersErr = msg.err
-	if msg.err == nil {
-		m.reviewers = msg.reviewers
-		m.reviewersLoaded = true
+	if msg.err != nil {
+		return m, nil
 	}
+	m.reviewers = msg.reviewers
+	m.reviewersAt = msg.at
+	m.reviewersLoaded = true
 	if m.picker != nil {
 		m.picker.setCandidates(m.reviewers)
 		m.ensurePickerVisible()
 	}
-	return m
+	reviewers, at := msg.reviewers, msg.at
+	return m, m.save(func(c *cache.Cache, repo github.Repo) error {
+		return c.SaveReviewers(repo, reviewers, at)
+	})
 }
 
 // requestSuggested loads GitHub's reviewer suggestions in the background for
@@ -322,30 +454,36 @@ func (m *Model) requestSuggested() tea.Cmd {
 	m.loadingSuggested = true
 	client := m.gh
 	return func() tea.Msg {
+		at := time.Now()
 		logins, err := client.FetchSuggested(context.Background(), numbers)
-		return suggestedLoadedMsg{heads: heads, logins: logins, err: err}
+		return suggestedLoadedMsg{heads: heads, logins: logins, at: at, err: err}
 	}
 }
 
 // applySuggested records suggestions, and reranks the open picker. A failed
 // load is retried after the next remote load.
-func (m Model) applySuggested(msg suggestedLoadedMsg) Model {
+func (m Model) applySuggested(msg suggestedLoadedMsg) (Model, tea.Cmd) {
 	m.loadingSuggested = false
 	if msg.err != nil {
-		return m
+		return m, nil
 	}
 	if m.suggested == nil {
 		m.suggested = map[int]suggestion{}
 	}
+	saved := map[int]cache.Suggestion{}
 	for n, head := range msg.heads {
 		m.suggested[n] = suggestion{head: head, logins: msg.logins[n]}
+		saved[n] = cache.Suggestion{Head: head, Logins: msg.logins[n]}
 	}
 	if m.picker != nil {
 		m.picker.suggested = m.suggestionsFor(m.picker.need)
 		m.picker.setCandidates(m.reviewers)
 		m.ensurePickerVisible()
 	}
-	return m
+	at := msg.at
+	return m, m.save(func(c *cache.Cache, repo github.Repo) error {
+		return c.SaveSuggested(repo, saved, at)
+	})
 }
 
 // suggestionsFor merges the suggestions for PR numbers, in order.

@@ -8,6 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/drew-council/gh-stack-tui/internal/cache"
 	"github.com/drew-council/gh-stack-tui/internal/git"
 	"github.com/drew-council/gh-stack-tui/internal/tui"
 )
@@ -72,7 +73,15 @@ func main() {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
-	if _, err := tea.NewProgram(tui.New(repo, opts)).Run(); err != nil {
+	// Without a cache the TUI still works, only slower to show PRs.
+	cacheDir, err := cache.Dir()
+	if err == nil {
+		opts.Cache, err = cache.Open(cacheDir)
+	}
+	opts.CacheErr = err
+	_, err = tea.NewProgram(tui.New(repo, opts)).Run()
+	opts.Cache.Close()
+	if err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}

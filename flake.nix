@@ -39,6 +39,7 @@
             gopls
             golines
             gofumpt
+            sqlc
           ];
         };
 
@@ -48,7 +49,7 @@
             version = "0.1.0";
             src = ./.;
             nativeBuildInputs = [ pkgs.git ];
-            vendorHash = "sha256-cwjqtdYR84Ha9x2ttxOI9F48LVythfKiZW2Xn8VBJk4=";
+            vendorHash = "sha256-9ekBdW0bToMfH9ZSVRDf7qjxdU1SW6N+G5HOXPLoUO8=";
             # The gh-stack shim is its own module; see third_party/gh-stack.
             excludedPackages = [ "third_party" ];
             postInstall = ''
@@ -60,6 +61,12 @@
 
         formatter = treefmtEval.config.build.wrapper;
         checks.formatting = treefmtEval.config.build.check self;
+        # The generated cache queries match queries.sql and schema.sql.
+        checks.sqlc = pkgs.runCommand "sqlc-diff" { nativeBuildInputs = [ pkgs.sqlc ]; } ''
+          cd ${./.}
+          sqlc diff
+          touch $out
+        '';
       }
     );
 }
