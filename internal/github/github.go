@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -101,13 +102,27 @@ const prFields = `number url title state isDraft merged reviewDecision mergeStat
     ... on StatusContext { context state targetUrl }
   } } } } } }`
 
+// fetchBatchSize is the most PRs fetched in one request. GitHub's gateway
+// gives up on large queries, so a long stack is fetched a few PRs at a time.
+const fetchBatchSize = 8
+
 // FetchPRs returns the PR for each lookup, keyed by branch. Branches with no PR
 // are absent from the result.
 func (c *Client) FetchPRs(ctx context.Context, lookups []Lookup) (map[string]*PR, error) {
-	if len(lookups) == 0 {
-		return map[string]*PR{}, nil
+	out := map[string]*PR{}
+	for start := 0; start < len(lookups); start += fetchBatchSize {
+		batch := lookups[start:min(start+fetchBatchSize, len(lookups))]
+		prs, err := c.fetchBatch(ctx, batch)
+		if err != nil {
+			return nil, err
+		}
+		maps.Copy(out, prs)
 	}
+	return out, nil
+}
 
+// fetchBatch fetches the PRs for one batch of lookups.
+func (c *Client) fetchBatch(ctx context.Context, lookups []Lookup) (map[string]*PR, error) {
 	var q strings.Builder
 	vars := map[string]any{"owner": c.Repo.Owner, "name": c.Repo.Name}
 	var params []string

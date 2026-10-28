@@ -2,6 +2,7 @@ package github
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -76,6 +77,24 @@ func TestFetchPRsKeepsDataFromPartialErrors(t *testing.T) {
 	}
 	if !strings.HasPrefix(fake.requests[0], "POST /graphql ") {
 		t.Fatalf("request = %s", fake.requests[0])
+	}
+}
+
+func TestFetchPRsSplitsLongStacks(t *testing.T) {
+	fake := &fakeGitHub{status: 200, body: `{"data": {"repository": {"b0": {"number": 2}}}}`}
+	lookups := make([]Lookup, fetchBatchSize+1)
+	for i := range lookups {
+		lookups[i] = Lookup{Branch: fmt.Sprintf("b%d", i), Number: i + 1}
+	}
+	prs, err := fakeClient(t, fake).FetchPRs(context.Background(), lookups)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.requests) != 2 {
+		t.Fatalf("requests = %d, want 2", len(fake.requests))
+	}
+	if len(prs) != 2 {
+		t.Fatalf("prs = %+v", prs)
 	}
 }
 
