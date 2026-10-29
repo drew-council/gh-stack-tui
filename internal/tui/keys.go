@@ -7,7 +7,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/drew-council/gh-stack-tui/internal/github"
 	"github.com/drew-council/gh-stack-tui/internal/stack"
 )
 
@@ -21,6 +20,9 @@ const (
 type confirmState struct {
 	text    string
 	actions map[string]func(*Model) tea.Cmd
+	// cancel runs when the key is not one of the actions. A wizard uses it to
+	// move on to the next step; nil cancels.
+	cancel func(*Model) tea.Cmd
 }
 
 // helpSection groups key bindings on the help screen.
@@ -56,7 +58,8 @@ var helpSections = []helpSection{
 		{"e", "edit file in $EDITOR"},
 		{"c", "checkout branch"},
 		{"M", "merge PR (and below)"},
-		{"D", "toggle PR(s) draft / ready (asks for reviewers)"},
+		{"D", "toggle PR(s) draft / ready (selection or hovered)"},
+		{"A", "ask reviewers (selection or hovered, draft or ready)"},
 	}},
 	{"stack", [][2]string{
 		{"p", "push"},
@@ -108,6 +111,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.mode, m.confirm = modeNormal, nil
 		if act, ok := c.actions[key]; ok {
 			return m, act(&m)
+		}
+		if c.cancel != nil {
+			return m, c.cancel(&m)
 		}
 		return m, m.setFlash("cancelled", false)
 	}
@@ -195,6 +201,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		cmd = m.confirmMerge()
 	case "D":
 		cmd = m.toggleDraft()
+	case "A":
+		cmd = m.askReviewers()
 
 	// stack operations
 	case "p":
@@ -465,6 +473,11 @@ func (m *Model) toggleMark() {
 	m.jumpBranch(1)
 }
 
+func (m *Model) clearSelection() {
+	m.marks = map[string]bool{}
+	m.visual = false
+}
+
 func (m *Model) toggleVisual() {
 	if m.visual {
 		// Leaving visual mode keeps the range as marks, like vim's gv-able
@@ -633,50 +646,73 @@ func (m *Model) confirmMerge() tea.Cmd {
 	return nil
 }
 
-// toggleDraft flips the draft state of the open PRs in the review selection
-// (marks, visual range, or the hovered branch). Drafts are marked ready for
-// review; when the selection has none, its PRs are converted back to drafts.
-// When a draft has nobody asked to review it in person, only teams, a picker
-// asks who should review it first. It needs live PR data, since the stack
-// file does not record draft or review state.
+// toggleDraft walks the open PRs in the review selection (marks, visual
+// range, or the hovered branch) one at a time. Drafts are marked ready for
+// review; when the selection has none, each ready PR is confirmed and
+// converted back to a draft. When a draft has nobody asked to review it in
+// person, only teams, a picker asks who should review it first. It needs live
+// PR data, since the stack file does not record draft or review state.
 func (m *Model) toggleDraft() tea.Cmd {
 	if m.snap == nil || len(m.snap.Branches) == 0 {
 		return nil
 	}
 	sel := m.reviewSelection()
-	var drafts, need []*github.PR
-	var draftNums, ready []string
+	var drafts, ready []wizardStep
 	for _, i := range sel {
-		if pr := m.prFor(i); pr != nil && pr.State == "OPEN" && !pr.Merged {
-			if pr.IsDraft {
-				drafts = append(drafts, pr)
-				draftNums = append(draftNums, fmt.Sprint(pr.Number))
-				if needsReviewers(pr) {
-					need = append(need, pr)
-				}
-			} else {
-				ready = append(ready, fmt.Sprint(pr.Number))
-			}
+		pr := m.prFor(i)
+		if pr == nil || pr.State != "OPEN" || pr.Merged {
+			continue
+		}
+		if pr.IsDraft {
+			drafts = append(
+				drafts,
+				wizardStep{pr: pr, branch: m.snap.Branches[i].Name, kind: wizardReady},
+			)
+		} else {
+			ready = append(
+				ready,
+				wizardStep{pr: pr, branch: m.snap.Branches[i].Name, kind: wizardDraft},
+			)
 		}
 	}
-	nums, undo := draftNums, false
-	if len(nums) == 0 {
-		nums, undo = ready, true
+	steps := drafts
+	if len(steps) == 0 {
+		steps = ready
 	}
-	if len(nums) == 0 {
+	if len(steps) == 0 {
 		if len(sel) == 1 {
 			return m.draftRefusal(sel[0])
 		}
-		return m.setFlash("no open PR selected", true)
+		return m.setFlash("no open PR in the selection", true)
 	}
-	// Skip the picker when the repository has nobody to ask.
-	if len(need) > 0 && !(m.reviewersLoaded && len(m.reviewers) == 0) {
-		return m.openPicker(drafts, need)
+	return m.startWizard(steps)
+}
+
+// askReviewers asks people to review the PRs in the review selection that
+// are still open, whether draft or ready for review. It leaves the draft
+// state and existing reviewers as they are.
+func (m *Model) askReviewers() tea.Cmd {
+	if m.snap == nil || len(m.snap.Branches) == 0 {
+		return nil
 	}
-	m.marks = map[string]bool{}
-	m.visual = false
-	title, name, args := draftToggle(nums, undo)
-	return m.runQuietOp(title, name, args...)
+	sel := m.reviewSelection()
+	var steps []wizardStep
+	for _, i := range sel {
+		pr := m.prFor(i)
+		if pr == nil || pr.State != "OPEN" || pr.Merged {
+			continue
+		}
+		steps = append(steps, wizardStep{
+			pr: pr, branch: m.snap.Branches[i].Name, kind: wizardReviewers,
+		})
+	}
+	if len(steps) == 0 {
+		if len(sel) == 1 {
+			return m.draftRefusal(sel[0])
+		}
+		return m.setFlash("no open PR in the selection", true)
+	}
+	return m.startWizard(steps)
 }
 
 // draftRefusal explains why branch i's PR cannot change draft state.

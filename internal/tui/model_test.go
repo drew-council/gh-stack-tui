@@ -234,7 +234,7 @@ func TestReviewSingleBranchWithPR(t *testing.T) {
 		edit func(*Model)
 		want string
 	}{
-		{"open PR", nil, nil, "tuicr pr 2"},
+		{"ready PR", nil, nil, "tuicr pr 2"},
 		{"draft PR", nil, func(m *Model) { m.prs["two"].IsDraft = true }, "tuicr pr 2"},
 		{"stack file only", nil, func(m *Model) { delete(m.prs, "two") }, "tuicr pr 2"},
 		{"closed PR", nil, func(m *Model) { m.prs["two"].State = "CLOSED" }, "tuicr -r h1..h2"},

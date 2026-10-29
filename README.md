@@ -28,6 +28,8 @@ Stack operations run `gh stack` against the checked out stack. When you are view
 
 Stack operations follow the aliases of the `gs` wrapper: `p` push, `s` sync, `P` sync --prune, `r` rebase, `c` checkout, `a` add, `m` modify, and `u` unstack. `R` takes the place of `gs review`.
 
+A selection of marked branches, or the visual range, is used by `R`, `D`, and `A`. Other commands use the hovered branch or item.
+
 | Navigate | | Hovered branch or item | |
 |---|---|---|---|
 | `j`/`k` `↓`/`↑` | prev/next branch, or item once inside | `o` | open in browser (PR, file, commit, workflow run, check) |
@@ -36,7 +38,8 @@ Stack operations follow the aliases of the `gs` wrapper: `p` push, `s` sync, `P`
 | `ctrl+d`/`ctrl+u` | half page | `e` | open file in `$EDITOR` |
 | `.` | current branch | `c` | checkout branch |
 | `[` `]` | prev/next stack | `M` | merge PR and the PRs below it (asks first) |
-| mouse | wheel scrolls, click selects or toggles | `D` | mark draft PRs ready (asks for reviewers), or convert open PRs to draft (hovered or selection) |
+| mouse | wheel scrolls, click selects or toggles | `D` | mark draft PRs ready (asks for reviewers), or convert open PRs to draft (asks first), on the hovered PR or selection |
+| | | `A` | ask for reviewers on the hovered PR or selection, whether it is a draft or ready for review |
 
 | Expand | | Stack | |
 |---|---|---|---|
@@ -54,11 +57,15 @@ Stack operations follow the aliases of the `gs` wrapper: `p` push, `s` sync, `P`
 
 ### Review
 
-`R` reviews the marked branches, or the visual range, or the hovered branch if nothing is selected. The stack is linear, so the selection becomes a single `base..head` range from the bottom selected layer to the top one. It then runs `--review-cmd` with `{range}` filled in. When the selection is a single branch with an open or draft PR, `--review-pr-cmd` runs instead with `{pr}` set to the PR number, so tuicr reviews the PR and comments can be submitted to it. Pass `--review-pr-cmd ''` to always review the range. By default that opens a new herdr tab when running inside herdr (`HERDR_ENV=1`), a new tmux window inside tmux, and otherwise suspends the TUI while the review runs. Use `--review-in` to force one of these.
+`R` reviews the marked branches, or the visual range, or the hovered branch if nothing is selected. The stack is linear, so the selection becomes a single `base..head` range from the bottom selected layer to the top one. It then runs `--review-cmd` with `{range}` filled in. When the selection is a single branch with an open PR, whether draft or ready, `--review-pr-cmd` runs instead with `{pr}` set to the PR number, so tuicr reviews the PR and comments can be submitted to it. Pass `--review-pr-cmd ''` to always review the range. By default that opens a new herdr tab when running inside herdr (`HERDR_ENV=1`), a new tmux window inside tmux, and otherwise suspends the TUI while the review runs. Use `--review-in` to force one of these.
 
 ### Reviewers
 
 When `D` marks a draft ready and nobody has been asked to review it in person (at most teams, such as the CODEOWNERS teams GitHub requests on its own), a picker asks who should review it first. Type to fuzzy filter by login or name, `tab` picks several people, and `enter` requests the picked people, or the hovered one if nobody is picked, then marks the PR ready. `ctrl+s` marks it ready without asking anyone, and `esc` leaves it a draft.
+
+A selection with several PRs is walked one PR at a time. Each prompt names the PR's branch, number, and title, and skipping one moves on to the next. When the selection has no drafts, `D` converts its PRs back to drafts, asking once per PR; answering no moves on to the next.
+
+`A` opens the same picker for the hovered PR or selection without changing its draft state, so reviewers can be added by hand. It works on drafts and ready PRs alike.
 
 The list puts GitHub's suggested reviewers for the PR first. Next come the people your last 50 PRs in the repository went to, most often first. Everyone else follows by login. The candidates load once in the background after the first GitHub refresh, so the picker opens instantly. GitHub's suggestions load in the background for drafts that need reviewers, and load again when a draft's head commit changes.
 

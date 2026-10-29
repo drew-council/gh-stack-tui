@@ -221,7 +221,7 @@ func TestReviewerRequestFailureKeepsDraft(t *testing.T) {
 	m = submit(t, m)
 	if len(fake.requests) != 1 || len(m.queue) != 0 || !m.flashErr ||
 		!strings.Contains(m.flash, "requesting review on #2") ||
-		!strings.Contains(m.flash, "nothing marked ready") {
+		!strings.Contains(m.flash, "left as a draft") {
 		t.Fatalf("a failed request should not mark ready, queue %+v flash %q", m.queue, m.flash)
 	}
 }
@@ -250,10 +250,14 @@ func TestReadySkipsPickerWhenSomeoneIsRequested(t *testing.T) {
 		t.Fatalf("a draft with a reviewer should just be marked ready, queue %+v", m.queue)
 	}
 
-	// Converting back to a draft never asks.
+	// Converting back to a draft asks first, but never for reviewers.
 	m = draftModel(t, &fakeGitHub{status: 201})
 	m.prs["two"].IsDraft = false
 	m = press(m, "D")
+	if m.mode != modeConfirm || len(m.queue) != 0 {
+		t.Fatalf("converting to a draft should confirm first, mode %v queue %+v", m.mode, m.queue)
+	}
+	m = press(m, "y")
 	if m.mode != modeNormal || len(m.queue) != 1 || m.queue[0].title != "draft #2" {
 		t.Fatalf("queue %+v", m.queue)
 	}
@@ -264,6 +268,159 @@ func TestReadySkipsPickerWhenSomeoneIsRequested(t *testing.T) {
 	m = press(m, "D")
 	if m.mode != modeNormal || len(m.queue) != 1 {
 		t.Fatalf("queue %+v", m.queue)
+	}
+}
+
+// draftPRs makes branches two and three drafts that only have team reviewers.
+func draftPRs(t *testing.T, fake *fakeGitHub) Model {
+	t.Helper()
+	m := draftModel(t, fake)
+	m.prs["three"] = &github.PR{
+		Number: 3, State: "OPEN", IsDraft: true, Title: "Third layer", HeadSHA: "h3",
+		RequestedTeams: []string{"go-readability"},
+	}
+	m.suggested[3] = suggestion{head: "h3", logins: []string{"yuki"}}
+	m.marks["two"], m.marks["three"] = true, true
+	return m
+}
+
+func TestReadyWizardWalksEachDraft(t *testing.T) {
+	fake := &fakeGitHub{status: 201}
+	m := press(draftPRs(t, fake), "D")
+	if m.mode != modeReviewers || m.picker.step.pr.Number != 2 {
+		t.Fatalf("first step should ask for #2, mode %v", m.mode)
+	}
+	if got := ansi.Strip(m.render()); !strings.Contains(got, "#2 Second layer") ||
+		!strings.Contains(got, "two · step 1/2 · only teams are requested") {
+		t.Fatalf("the first step should show its branch, number, title, and progress:\n%s", got)
+	}
+
+	m = submit(t, m)
+	if m.mode != modeReviewers || m.picker.step.pr.Number != 3 {
+		t.Fatalf("the wizard should move to #3, mode %v", m.mode)
+	}
+	if got := ansi.Strip(m.render()); !strings.Contains(got, "#3 Third layer") ||
+		!strings.Contains(got, "three · step 2/2 · only teams are requested") {
+		t.Fatalf("the second step should show its branch, number, title, and progress:\n%s", got)
+	}
+
+	m = submit(t, m)
+	if m.mode != modeNormal || m.wizard != nil || len(m.queue) != 2 {
+		t.Fatalf("both drafts should be marked ready, mode %v wizard %+v queue %+v",
+			m.mode, m.wizard, m.queue)
+	}
+	if m.queue[0].title != "ready #2 → yuki" || m.queue[1].title != "ready #3 → yuki" {
+		t.Fatalf("queue = %+v", m.queue)
+	}
+	if len(fake.requests) != 2 ||
+		!strings.Contains(fake.requests[0], "/pulls/2/requested_reviewers") ||
+		!strings.Contains(fake.requests[1], "/pulls/3/requested_reviewers") {
+		t.Fatalf("requests = %q", fake.requests)
+	}
+}
+
+func TestReviewerWizardSkipMovesOn(t *testing.T) {
+	m := press(draftPRs(t, &fakeGitHub{status: 201}), "D")
+	m = press(m, "esc")
+	if m.mode != modeReviewers || m.picker.step.pr.Number != 3 {
+		t.Fatalf("skipping #2 should ask about #3, mode %v", m.mode)
+	}
+	m = press(m, "esc")
+	if m.mode != modeNormal || m.wizard != nil || len(m.queue) != 0 {
+		t.Fatalf("skipping the last PR should end the wizard, mode %v queue %+v", m.mode, m.queue)
+	}
+}
+
+func TestDraftMixedSelectionOnlyMarksDraftsReady(t *testing.T) {
+	m := draftModel(t, &fakeGitHub{status: 201})
+	m.prs["three"] = &github.PR{
+		Number: 3, State: "OPEN", Title: "Third layer", HeadSHA: "h3",
+	}
+	m.marks["two"], m.marks["three"] = true, true
+
+	m = press(m, "D")
+	if m.mode != modeReviewers || m.picker.step.pr.Number != 2 || len(m.wizard.steps) != 1 {
+		t.Fatalf("only the draft should be walked, mode %v", m.mode)
+	}
+	m = submit(t, m)
+	if m.mode != modeNormal || len(m.queue) != 1 || m.queue[0].title != "ready #2 → yuki" {
+		t.Fatalf("the ready PR should stay ready, mode %v queue %+v", m.mode, m.queue)
+	}
+}
+
+func TestWizardMovesOnBeforeTheRequestReturns(t *testing.T) {
+	m := press(draftPRs(t, &fakeGitHub{status: 201}), "D")
+	m.submitPicker([]string{"yuki"})
+	if m.mode != modeReviewers || m.picker.step.pr.Number != 3 {
+		t.Fatalf("the next prompt should open right away, mode %v", m.mode)
+	}
+	if len(m.queue) != 0 {
+		t.Fatalf(
+			"#2 should not be marked ready before its reviewers are requested, queue %+v",
+			m.queue,
+		)
+	}
+
+	next, _ := m.Update(reviewersRequestedMsg{num: 2, ready: true, who: "yuki"})
+	m = next.(Model)
+	if m.mode != modeReviewers || m.picker.step.pr.Number != 3 ||
+		len(m.queue) != 1 || m.queue[0].title != "ready #2 → yuki" {
+		t.Fatalf("the reply should mark #2 ready and leave the #3 prompt open, mode %v queue %+v",
+			m.mode, m.queue)
+	}
+}
+
+func TestCancelKeepsSelection(t *testing.T) {
+	m := press(draftPRs(t, &fakeGitHub{status: 201}), "D")
+	if len(m.marks) != 2 {
+		t.Fatalf("marks = %v", m.marks)
+	}
+	m = press(m, "esc")
+	if m.mode != modeReviewers || len(m.marks) != 2 {
+		t.Fatalf("skipping the first PR should keep the selection, mode %v marks %v",
+			m.mode, m.marks)
+	}
+	m = press(m, "esc")
+	if len(m.marks) != 2 {
+		t.Fatalf("cancelling the wizard should keep the selection, marks %v", m.marks)
+	}
+}
+
+func TestAskReviewersDoesNotChangeDraftState(t *testing.T) {
+	fake := &fakeGitHub{status: 201}
+	m := draftModel(t, fake)
+	m.prs["two"].IsDraft = false
+	m = press(m, "A")
+	if m.mode != modeReviewers || m.picker.ready {
+		t.Fatalf("A should open the reviewers picker without marking ready, mode %v", m.mode)
+	}
+	m = submit(t, m)
+	if len(fake.requests) != 1 || len(m.queue) != 0 {
+		t.Fatalf("A should only request reviewers, requests %q queue %+v", fake.requests, m.queue)
+	}
+}
+
+func TestDraftWizardConfirmsEachAndSkipsRejected(t *testing.T) {
+	fake := &fakeGitHub{status: 201}
+	m := draftModel(t, fake)
+	m.prs["two"].IsDraft = false
+	m.prs["three"] = &github.PR{
+		Number: 3, State: "OPEN", Title: "Third layer", HeadSHA: "h3",
+	}
+	m.marks["two"], m.marks["three"] = true, true
+
+	m = press(m, "D")
+	if m.mode != modeConfirm || !strings.Contains(m.confirm.text, "#2 (two) Second layer") {
+		t.Fatalf("first confirm should name #2, branch, and title, mode %v text %q",
+			m.mode, m.confirm.text)
+	}
+	m = press(m, "n")
+	if m.mode != modeConfirm || !strings.Contains(m.confirm.text, "#3 (three) Third layer") {
+		t.Fatalf("rejecting #2 should confirm #3 next, mode %v text %q", m.mode, m.confirm.text)
+	}
+	m = press(m, "y")
+	if m.mode != modeNormal || len(m.queue) != 1 || m.queue[0].title != "draft #3" {
+		t.Fatalf("only #3 should be converted, queue %+v", m.queue)
 	}
 }
 

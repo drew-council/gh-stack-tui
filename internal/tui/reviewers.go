@@ -15,15 +15,42 @@ import (
 	"github.com/drew-council/gh-stack-tui/internal/github"
 )
 
-// pickerState is the reviewer picker. It opens when drafts are marked ready
-// that nobody has been asked to review in person, only teams such as
-// CODEOWNERS teams, and asks the chosen people before marking them ready.
+// wizardKind says what each wizard step does to its PR.
+type wizardKind int
+
+const (
+	// wizardReady asks for reviewers when a draft needs them, then marks the
+	// draft ready for review.
+	wizardReady wizardKind = iota
+	// wizardReviewers asks for reviewers and leaves the PR as it is.
+	wizardReviewers
+	// wizardDraft confirms, then converts a ready PR back to a draft.
+	wizardDraft
+)
+
+// wizardStep is one PR the wizard acts on.
+type wizardStep struct {
+	pr     *github.PR
+	branch string
+	kind   wizardKind
+}
+
+// wizardState walks the selected PRs one at a time, so each gets its own
+// prompt with its own branch, number, and title for context.
+type wizardState struct {
+	steps []wizardStep
+	i     int
+}
+
+// pickerState is the reviewer picker. It opens when PRs need reviewers, and
+// asks for the chosen people before the wizard moves on.
 type pickerState struct {
-	// nums are the drafts to mark ready, and need the ones among them that
-	// get the reviewers.
-	nums []string
-	need []int
-	// subject and context describe the PRs in the header.
+	// step is the PR this prompt is for; ready also marks it ready for review
+	// after the reviewers are requested.
+	step  wizardStep
+	ready bool
+	need  []int
+	// subject and context describe the PR in the header.
 	subject, context string
 	// suggested are GitHub's suggestions for the PRs in need, best first.
 	suggested []string
@@ -55,35 +82,29 @@ func needsReviewers(pr *github.PR) bool {
 	return pr.IsDraft && pr.NeedsReviewers()
 }
 
-// openPicker asks who should review the drafts in need before the drafts are
-// marked ready.
-func (m *Model) openPicker(drafts []*github.PR, need []*github.PR) tea.Cmd {
-	p := &pickerState{}
-	for _, pr := range drafts {
-		p.nums = append(p.nums, fmt.Sprint(pr.Number))
-	}
-	var teams, numbers []string
-	for _, pr := range need {
-		p.need = append(p.need, pr.Number)
-		numbers = append(numbers, fmt.Sprintf("#%d", pr.Number))
-		for _, t := range pr.RequestedTeams {
-			if !slices.Contains(teams, t) {
-				teams = append(teams, t)
-			}
-		}
-	}
+// openPickerStep asks who should review the current wizard step's PR.
+func (m *Model) openPickerStep(step wizardStep, ready bool) tea.Cmd {
+	pr := step.pr
+	p := &pickerState{step: step, ready: ready, need: []int{pr.Number}}
 	p.suggested = m.suggestionsFor(p.need)
-	p.subject = strings.Join(numbers, ", ")
-	if len(need) == 1 && need[0].Title != "" {
-		p.subject += " " + need[0].Title
+	p.subject = fmt.Sprintf("#%d", pr.Number)
+	if pr.Title != "" {
+		p.subject += " " + pr.Title
 	}
-	p.context = "nobody is requested yet"
-	if len(teams) > 0 {
-		p.context = "only teams are requested: " + strings.Join(teams, ", ")
+	p.context = step.branch
+	if w := m.wizard; w != nil && len(w.steps) > 1 {
+		p.context += fmt.Sprintf(" · step %d/%d", w.i+1, len(w.steps))
 	}
-	if extra := len(drafts) - len(need); extra > 0 {
-		p.context += fmt.Sprintf(" · %s with reviewers also marked ready",
-			plural(extra, "other draft", "other drafts"))
+	switch {
+	case len(pr.Reviewers) > 0:
+		p.context += " · requested: " + strings.Join(pr.Reviewers, ", ")
+	case len(pr.RequestedTeams) > 0:
+		p.context += " · only teams are requested: " + strings.Join(pr.RequestedTeams, ", ")
+	default:
+		p.context += " · nobody is requested yet"
+	}
+	if len(pr.Reviewers) > 0 && len(pr.RequestedTeams) > 0 {
+		p.context += " · teams: " + strings.Join(pr.RequestedTeams, ", ")
 	}
 	p.setCandidates(m.reviewers)
 
@@ -91,9 +112,90 @@ func (m *Model) openPicker(drafts []*github.PR, need []*github.PR) tea.Cmd {
 	m.mode = modeReviewers
 	m.input.SetValue("")
 	m.input.Placeholder = "type to filter"
-	// Suggestions still missing (a failed load, or a draft that just
-	// appeared) rerank the picker when they arrive.
+	// Suggestions still missing (a failed load, or a PR that just appeared)
+	// rerank the picker when they arrive.
 	return tea.Batch(m.input.Focus(), m.requestSuggested())
+}
+
+// combine runs cmds together, ignoring the ones that are nil.
+func combine(cmds ...tea.Cmd) tea.Cmd {
+	var out []tea.Cmd
+	for _, cmd := range cmds {
+		if cmd != nil {
+			out = append(out, cmd)
+		}
+	}
+	switch len(out) {
+	case 0:
+		return nil
+	case 1:
+		return out[0]
+	}
+	return tea.Batch(out...)
+}
+
+// startWizard walks steps one at a time. The selection stays until a step
+// actually does something, so cancelling does not lose it.
+func (m *Model) startWizard(steps []wizardStep) tea.Cmd {
+	m.wizard = &wizardState{steps: steps}
+	return m.nextWizardStep()
+}
+
+// advanceWizard moves to the next step, or finishes when there is none.
+func (m *Model) advanceWizard() tea.Cmd {
+	if m.wizard == nil {
+		return nil
+	}
+	m.wizard.i++
+	return m.nextWizardStep()
+}
+
+// nextWizardStep opens the prompt for the current step, and does the steps
+// that need no prompt. Steps that need no prompt still advance one at a time.
+func (m *Model) nextWizardStep() tea.Cmd {
+	w := m.wizard
+	if w == nil {
+		return nil
+	}
+	if w.i >= len(w.steps) {
+		m.wizard = nil
+		return nil
+	}
+	step := w.steps[w.i]
+	n := []string{fmt.Sprint(step.pr.Number)}
+	switch step.kind {
+	case wizardDraft:
+		text := fmt.Sprintf("convert #%d (%s)", step.pr.Number, step.branch)
+		if step.pr.Title != "" {
+			text += " " + step.pr.Title
+		}
+		text += " to draft?"
+		if len(w.steps) > 1 {
+			text += fmt.Sprintf("  step %d/%d", w.i+1, len(w.steps))
+		}
+		m.mode = modeConfirm
+		m.confirm = &confirmState{
+			text: text + "  [y]es  [n]o",
+			actions: map[string]func(*Model) tea.Cmd{
+				"y": func(m *Model) tea.Cmd {
+					title, name, args := draftToggle(n, true)
+					m.clearSelection()
+					return combine(m.runQuietOp(title, name, args...), m.advanceWizard())
+				},
+			},
+			cancel: func(m *Model) tea.Cmd { return m.advanceWizard() },
+		}
+		return nil
+	case wizardReady:
+		if needsReviewers(step.pr) && !(m.reviewersLoaded && len(m.reviewers) == 0) {
+			return m.openPickerStep(step, true)
+		}
+		title, name, args := draftToggle(n, false)
+		m.clearSelection()
+		return combine(m.runQuietOp(title, name, args...), m.advanceWizard())
+	default:
+		return m.openPickerStep(step, false)
+	}
 }
 
 func (m *Model) closePicker() {
@@ -239,6 +341,14 @@ func (m Model) handlePickerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "ctrl+c":
 		m.closePicker()
+		if m.wizard != nil {
+			last := m.wizard.i+1 >= len(m.wizard.steps)
+			cmd := m.advanceWizard()
+			if last {
+				return m, combine(cmd, m.setFlash("cancelled", false))
+			}
+			return m, cmd
+		}
 		return m, m.setFlash("cancelled", false)
 	case "up", "ctrl+p", "ctrl+k":
 		p.move(-1)
@@ -276,46 +386,54 @@ func (m Model) handlePickerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// reviewersRequestedMsg reports that reviewers were requested, and carries
-// the op that marks the drafts ready.
+// reviewersRequestedMsg reports that reviewers were requested for a PR, and
+// whether that PR should also be marked ready.
 type reviewersRequestedMsg struct {
-	ready pendingOp
+	num   int
+	ready bool
+	who   string
 	err   error
 }
 
-// submitPicker asks logins to review the drafts in need, then marks every
-// draft ready. Reviewers are requested first, so if that fails the drafts
-// stay drafts. With no logins the drafts are only marked ready.
+// submitPicker asks logins to review the current step's PR, and moves on to
+// the next step without waiting, so keys typed for the next prompt never land
+// in normal mode. A draft is marked ready only once its reviewers are
+// requested, so if that fails it stays a draft. With no logins the step is
+// skipped, and a draft is only marked ready.
 func (m *Model) submitPicker(logins []string) tea.Cmd {
 	p := m.picker
 	m.closePicker()
-	m.marks = map[string]bool{}
-	m.visual = false
-	title, name, args := draftToggle(p.nums, false)
-	ready := pendingOp{title: title, name: name, args: args, quiet: true}
+	num, ready := p.step.pr.Number, p.ready
 	if len(logins) == 0 {
-		return m.enqueue(ready)
+		var cmd tea.Cmd
+		if ready {
+			title, name, args := draftToggle([]string{fmt.Sprint(num)}, false)
+			m.clearSelection()
+			cmd = m.runQuietOp(title, name, args...)
+		}
+		return combine(cmd, m.advanceWizard())
 	}
 	if m.gh == nil {
+		m.wizard = nil
 		return m.setFlash("not connected to GitHub yet", true)
 	}
+	m.clearSelection()
 	who := strings.Join(logins, ", ")
-	ready.title += " → " + who
-	client, need := m.gh, p.need
-	return tea.Batch(
-		m.setFlash("requesting review from "+who+"…", false),
+	client := m.gh
+	return combine(
+		m.setFlash(fmt.Sprintf("requesting review on #%d from %s…", num, who), false),
 		func() tea.Msg {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
-			for _, n := range need {
-				if err := client.RequestReviewers(ctx, n, logins); err != nil {
-					return reviewersRequestedMsg{
-						err: fmt.Errorf("requesting review on #%d: %w", n, err),
-					}
+			if err := client.RequestReviewers(ctx, num, logins); err != nil {
+				return reviewersRequestedMsg{
+					num: num, ready: ready,
+					err: fmt.Errorf("requesting review on #%d: %w", num, err),
 				}
 			}
-			return reviewersRequestedMsg{ready: ready}
+			return reviewersRequestedMsg{num: num, ready: ready, who: who}
 		},
+		m.advanceWizard(),
 	)
 }
 

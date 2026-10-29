@@ -417,7 +417,7 @@ func (m *Model) reviewRange(sel []int) (rng string, gap bool, err error) {
 }
 
 // reviewPR returns the number of branch i's PR when it can be reviewed on
-// GitHub: open or draft, from live data when loaded, else the stack file.
+// GitHub: open (draft or ready), from live data when loaded, else the stack file.
 func (m *Model) reviewPR(i int) int {
 	if pr := m.prFor(i); pr != nil {
 		if pr.State != "OPEN" || pr.Merged {
@@ -429,8 +429,8 @@ func (m *Model) reviewPR(i int) int {
 }
 
 // reviewCommand builds the review command for a selection. A single branch
-// with an open PR is reviewed as that PR, so comments can be posted to it;
-// anything else is reviewed as a commit range.
+// with an open PR (draft or ready) is reviewed as that PR, so comments can be
+// posted to it; anything else is reviewed as a commit range.
 func (m *Model) reviewCommand(sel []int) (command, note string, err error) {
 	if len(sel) == 1 && m.opts.ReviewPRCmd != "" {
 		if n := m.reviewPR(sel[0]); n > 0 {
@@ -468,8 +468,7 @@ func (m *Model) startReview() tea.Cmd {
 		label = fmt.Sprintf("review %s +%d", shortBranch(names[len(names)-1]), len(names)-1)
 	}
 
-	m.marks = map[string]bool{}
-	m.visual = false
+	m.clearSelection()
 
 	root := m.repo.Root
 	switch where := reviewTarget(m.opts.ReviewIn); where {

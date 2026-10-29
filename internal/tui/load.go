@@ -430,23 +430,34 @@ func (m Model) applyReviewers(msg reviewersLoadedMsg) (Model, tea.Cmd) {
 }
 
 // requestSuggested loads GitHub's reviewer suggestions in the background for
-// the drafts that would open the reviewer picker. They are slow for GitHub to
-// compute, so they are fetched once per head commit rather than every poll.
+// the drafts that would open the reviewer picker, and for the PR the picker
+// is asking about. They are slow for GitHub to compute, so they are
+// fetched once per head commit rather than every poll.
 func (m *Model) requestSuggested() tea.Cmd {
 	if m.loadingSuggested || m.gh == nil {
 		return nil
 	}
 	heads := map[int]string{}
 	var numbers []int
-	for _, pr := range m.prs {
-		if pr.State != "OPEN" || !needsReviewers(pr) {
-			continue
+	seen := map[int]bool{}
+	add := func(pr *github.PR) {
+		if seen[pr.Number] {
+			return
 		}
+		seen[pr.Number] = true
 		if s, ok := m.suggested[pr.Number]; ok && s.head == pr.HeadSHA {
-			continue
+			return
 		}
 		heads[pr.Number] = pr.HeadSHA
 		numbers = append(numbers, pr.Number)
+	}
+	for _, pr := range m.prs {
+		if pr.State == "OPEN" && needsReviewers(pr) {
+			add(pr)
+		}
+	}
+	if m.picker != nil && m.picker.step.pr != nil {
+		add(m.picker.step.pr)
 	}
 	if len(numbers) == 0 {
 		return nil
@@ -460,7 +471,7 @@ func (m *Model) requestSuggested() tea.Cmd {
 	}
 }
 
-// applySuggested records suggestions, and reranks the open picker. A failed
+// applySuggested records suggestions, and reranks the active picker. A failed
 // load is retried after the next remote load.
 func (m Model) applySuggested(msg suggestedLoadedMsg) (Model, tea.Cmd) {
 	m.loadingSuggested = false
@@ -475,15 +486,19 @@ func (m Model) applySuggested(msg suggestedLoadedMsg) (Model, tea.Cmd) {
 		m.suggested[n] = suggestion{head: head, logins: msg.logins[n]}
 		saved[n] = cache.Suggestion{Head: head, Logins: msg.logins[n]}
 	}
+	var cmd tea.Cmd
 	if m.picker != nil {
 		m.picker.suggested = m.suggestionsFor(m.picker.need)
 		m.picker.setCandidates(m.reviewers)
 		m.ensurePickerVisible()
+		// The picker may have opened while another load was running, so
+		// fetch its suggestions if they were not part of that load.
+		cmd = m.requestSuggested()
 	}
 	at := msg.at
-	return m, m.save(func(c *cache.Cache, repo github.Repo) error {
+	return m, combine(cmd, m.save(func(c *cache.Cache, repo github.Repo) error {
 		return c.SaveSuggested(repo, saved, at)
-	})
+	}))
 }
 
 // suggestionsFor merges the suggestions for PR numbers, in order.

@@ -657,9 +657,15 @@ func (m Model) footer() string {
 	case modeHelp:
 		return s.dim.Render("press any key to close help")
 	case modeReviewers:
+		if m.picker != nil && !m.picker.ready {
+			return m.hints(
+				"↑/↓", "move", "tab", "pick", "enter", "request review",
+				"ctrl+s", "skip", "esc", "skip",
+			)
+		}
 		return m.hints(
 			"↑/↓", "move", "tab", "pick", "enter", "request review + mark ready",
-			"ctrl+s", "mark ready without", "esc", "cancel",
+			"ctrl+s", "mark ready without", "esc", "skip",
 		)
 	}
 	switch m.pendingKey {
@@ -690,7 +696,20 @@ func (m Model) footer() string {
 			mode = "visual"
 		}
 		return s.selected.Render(mode) + s.dim.Render(fmt.Sprintf(" %d selected  ", n)) +
-			m.hints("R", "review", "space", "mark", "v", "end visual", "esc", "clear")
+			m.hints(
+				"R",
+				"review",
+				"D",
+				"draft/ready",
+				"A",
+				"reviewers",
+				"space",
+				"mark",
+				"v",
+				"visual",
+				"esc",
+				"clear",
+			)
 	}
 	if r, ok := m.hovered(); ok && r.item() {
 		return m.hints(

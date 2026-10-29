@@ -2,6 +2,7 @@
 package tui
 
 import (
+	"fmt"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
@@ -24,8 +25,8 @@ type Options struct {
 	StackNumber int
 	// ReviewCmd is the review command; {range} is replaced by base..head.
 	ReviewCmd string
-	// ReviewPRCmd reviews a single branch that has an open PR; {pr} is
-	// replaced by the PR number. Empty always reviews the commit range.
+	// ReviewPRCmd reviews a single branch that has an open PR, draft or ready;
+	// {pr} is replaced by the PR number. Empty always reviews the commit range.
 	ReviewPRCmd string
 	// ReviewIn picks where the review opens: auto, herdr, tmux, or inline.
 	ReviewIn string
@@ -103,6 +104,7 @@ type Model struct {
 	promptKind promptKind
 	confirm    *confirmState
 	picker     *pickerState
+	wizard     *wizardState
 
 	op          *opState
 	queue       []pendingOp
@@ -228,9 +230,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case reviewersRequestedMsg:
 		if msg.err != nil {
-			return m, m.setFlash(msg.err.Error()+": nothing marked ready", true)
+			text := msg.err.Error()
+			if msg.ready {
+				text += ": left as a draft"
+			}
+			return m, m.setFlash(text, true)
 		}
-		return m, m.enqueue(msg.ready)
+		if !msg.ready {
+			return m, m.setFlash(
+				fmt.Sprintf("requested review on #%d from %s", msg.num, msg.who),
+				false,
+			)
+		}
+		title, name, args := draftToggle([]string{fmt.Sprint(msg.num)}, false)
+		return m, m.runQuietOp(title+" → "+msg.who, name, args...)
 
 	case opLineMsg:
 		m.appendOutput(msg.line)
