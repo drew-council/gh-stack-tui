@@ -342,21 +342,28 @@ func nativeCopy(text string) error {
 }
 
 func openBrowser(url string) tea.Cmd {
+	return openURLs([]string{url}, "opened "+url)
+}
+
+// openURLs opens every URL in the browser and reports what it opened.
+func openURLs(urls []string, what string) tea.Cmd {
 	return func() tea.Msg {
-		var cmd *exec.Cmd
-		switch runtime.GOOS {
-		case "darwin":
-			cmd = exec.Command("open", url)
-		case "windows":
-			cmd = exec.Command("cmd", "/c", "start", url)
-		default:
-			cmd = exec.Command("xdg-open", url)
+		for _, url := range urls {
+			var cmd *exec.Cmd
+			switch runtime.GOOS {
+			case "darwin":
+				cmd = exec.Command("open", url)
+			case "windows":
+				cmd = exec.Command("cmd", "/c", "start", url)
+			default:
+				cmd = exec.Command("xdg-open", url)
+			}
+			if err := cmd.Start(); err != nil {
+				return flashMsg{text: "opening browser: " + err.Error(), err: true}
+			}
+			go func() { _ = cmd.Wait() }()
 		}
-		if err := cmd.Start(); err != nil {
-			return flashMsg{text: "opening browser: " + err.Error(), err: true}
-		}
-		go func() { _ = cmd.Wait() }()
-		return flashMsg{text: "opened " + url}
+		return flashMsg{text: what}
 	}
 }
 

@@ -52,7 +52,7 @@ var helpSections = []helpSection{
 		{"z / Z", "toggle branch / collapse all"},
 	}},
 	{"branch or item", [][2]string{
-		{"o", "open in browser"},
+		{"o", "open PR(s) / item in browser"},
 		{"y", "copy name(s) / path / sha / url"},
 		{"Y", "copy changed file paths"},
 		{"e", "edit file in $EDITOR"},
@@ -501,6 +501,9 @@ func (m *Model) toggleVisual() {
 // --- hovered item actions ---
 
 func (m *Model) openHovered() tea.Cmd {
+	if sel := m.selectedBranches(); len(sel) > 0 {
+		return m.openSelected(sel)
+	}
 	r, ok := m.hovered()
 	if !ok || r.branch < 0 {
 		return nil
@@ -535,6 +538,36 @@ func (m *Model) openHovered() tea.Cmd {
 		return m.setFlash("no pull request for "+m.snap.Branches[r.branch].Name, true)
 	}
 	return openBrowser(url)
+}
+
+// openSelected opens the PR of every selected branch that has one.
+func (m *Model) openSelected(sel []int) tea.Cmd {
+	var urls, labels []string
+	skipped := 0
+	for _, i := range sel {
+		url := m.prURL(i)
+		if url == "" {
+			skipped++
+			continue
+		}
+		urls = append(urls, url)
+		label := m.snap.Branches[i].Name
+		if n := m.prNumber(i); n > 0 {
+			label = fmt.Sprintf("#%d", n)
+		}
+		labels = append(labels, label)
+	}
+	if len(urls) == 0 {
+		if len(sel) == 1 {
+			return m.setFlash("no pull request for "+m.snap.Branches[sel[0]].Name, true)
+		}
+		return m.setFlash("no pull requests in the selection", true)
+	}
+	what := "opened " + strings.Join(labels, ", ")
+	if skipped > 0 {
+		what += fmt.Sprintf(" · %d without a PR", skipped)
+	}
+	return openURLs(urls, what)
 }
 
 func (m *Model) yankHovered() tea.Cmd {

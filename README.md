@@ -28,11 +28,11 @@ Stack operations run `gh stack` against the checked out stack. When you are view
 
 Stack operations follow the aliases of the `gs` wrapper: `p` push, `s` sync, `P` sync --prune, `r` rebase, `c` checkout, `a` add, `m` modify, and `u` unstack. `R` takes the place of `gs review`.
 
-A selection of marked branches, or the visual range, is used by `R`, `D`, `A`, `y`, and `Y`. `y` copies the branch names one per line, and `Y` copies the selected branches' unique changed file paths one per line. Other commands use the hovered branch or item.
+A selection of marked branches, or the visual range, is used by `R`, `D`, `A`, `o`, `y`, and `Y`. `o` opens each selected branch's PR, `y` copies the branch names one per line, and `Y` copies the selected branches' unique changed file paths one per line. Other commands use the hovered branch or item.
 
 | Navigate | | Hovered branch or item | |
 |---|---|---|---|
-| `j`/`k` `↓`/`↑` | prev/next branch, or item once inside | `o` | open in browser (PR, file, commit, workflow run, check) |
+| `j`/`k` `↓`/`↑` | prev/next branch, or item once inside | `o` | open PR(s) or the hovered file, commit, workflow run, or check in the browser |
 | `J`/`K` | prev/next branch, from anywhere | `y` | copy branch name(s) / path / SHA / URL |
 | `gg`/`G` | top/bottom branch | `Y` | copy every changed file path (selection or branch) |
 | `ctrl+d`/`ctrl+u` | half page | `e` | open file in `$EDITOR` |
