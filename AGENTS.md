@@ -10,8 +10,9 @@ Agents MAY update this file without asking. When a change makes something here w
 - `internal/github`: GraphQL queries and PR, CI, and reviewer state.
 - `internal/cache`: SQLite cache of GitHub results, generated with sqlc.
 - `internal/git`, `internal/stack`: local repository and stack state.
+- `internal/demo`: made-up stacks and PRs in every state, for `ghst demo` and the rendering tests.
 
-The model reads stacks through the `Local` interface and PRs through `Remote` (`internal/tui/sources.go`). `stack.Source` and `github.Client` implement them.
+The model reads stacks through the `Local` interface and PRs through `Remote` (`internal/tui/sources.go`). `stack.Source` and `github.Client` are the real ones and `internal/demo` the fake ones. The model MUST NOT check for the demo. Add a method to an interface instead.
 
 ## Testing
 
@@ -24,6 +25,8 @@ When a UI change is intended, rewrite the golden files:
 ```sh
 go test ./internal/tui -update
 ```
+
+To look at the UI by hand, run `go run . demo`.
 
 Then read the `git diff` of `testdata` and confirm every change is intended. Never run `-update` just to make a failing test pass. Pass `-update` to `internal/tui` only; packages without golden files reject the flag.
 

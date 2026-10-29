@@ -18,6 +18,8 @@ It covers what `gh stack view` shows, and adds:
 go run . [-C dir] [--stack N] [--interval 30s] [--poll 2s] [--review-cmd 'tuicr -r {range}'] [--review-pr-cmd 'tuicr pr {pr}'] [--review-in auto]
 ```
 
+`go run . demo` shows made-up stacks instead of a repository's, to try the UI. Commands still run, in an empty temporary directory, so they fail without touching anything.
+
 The TUI shows the stack containing the checked out branch and follows you when you check out a branch in another stack. On trunk, or with a detached HEAD mid-rebase, it keeps showing the last stack. `[` and `]` switch between stacks and pin the choice until you next check out a branch.
 
 Stack operations run `gh stack` against the checked out stack. When you are viewing a different stack, press `c` on one of its branches first.
@@ -80,7 +82,7 @@ go run .
 go test ./...
 ```
 
-Rendering tests compare the screen, without color, to golden files in `internal/tui/testdata`. After an intended UI change, rewrite them and review the diff before committing:
+`go run . demo` shows the UI with made-up data. Rendering tests compare the screen, without color, to golden files in `internal/tui/testdata`. After an intended UI change, rewrite them and review the diff before committing:
 
 ```sh
 go test ./internal/tui -update

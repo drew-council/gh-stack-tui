@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/drew-council/gh-stack-tui/internal/cache"
+	"github.com/drew-council/gh-stack-tui/internal/demo"
 	"github.com/drew-council/gh-stack-tui/internal/git"
 	"github.com/drew-council/gh-stack-tui/internal/stack"
 	"github.com/drew-council/gh-stack-tui/internal/tui"
@@ -81,7 +82,20 @@ func rootCmd() *cobra.Command {
 		0,
 		"stack `number` to show at startup (default: the checked out stack)",
 	)
+
+	cmd.AddCommand(demoCmd(&opts))
 	return cmd
+}
+
+func demoCmd(opts *tui.Options) *cobra.Command {
+	return &cobra.Command{
+		Use:   "demo",
+		Short: "Show made-up stacks to try the UI",
+		Long: "Show made-up stacks and pull requests instead of a repository's.\n" +
+			"Commands still run, in an empty temporary directory, so they fail without touching anything.",
+		Args: cobra.NoArgs,
+		RunE: func(*cobra.Command, []string) error { return runDemo(*opts) },
+	}
 }
 
 func run(dir string, opts tui.Options) error {
@@ -101,5 +115,22 @@ func run(dir string, opts tui.Options) error {
 	opts.CacheErr = err
 	_, err = tea.NewProgram(tui.New(stack.NewSource(repo), opts)).Run()
 	opts.Cache.Close()
+	return err
+}
+
+// runDemo shows the demo stacks. Commands run in an empty directory, so they
+// fail without touching any repository.
+func runDemo(opts tui.Options) error {
+	dir, err := os.MkdirTemp("", "ghst-demo-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(dir)
+	if err := os.Chdir(dir); err != nil {
+		return err
+	}
+	remote := &demo.Remote{Delay: 600 * time.Millisecond}
+	opts.Connect = func(string) (tui.Remote, error) { return remote, nil }
+	_, err = tea.NewProgram(tui.New(demo.NewSource(time.Now, dir), opts)).Run()
 	return err
 }
