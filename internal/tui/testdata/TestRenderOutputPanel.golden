@@ -16,7 +16,7 @@
 █│ │ ▸ 5 files + 1 generated                                                    │
 █│ │ ▸ 4 commits                                                                │
 █│ │ ▸ 6 checks                                                                 │
- │ │                                                                            │
+█│ │                                                                            │
  │ ○ auth/middleware                                                    +242 -6 │
  │ │ #104 Require a session on every API route                         approved │
  │ │ 1 unresolved                                                     ✓ passing │
@@ -26,7 +26,7 @@
  │ │                                                                            │
  │ ◎ auth/token-refresh                                                +184 -12 │
  │ │ #103 Refresh access tokens before they expire                       queued │
- ╰──────────────────────────────────────────────────────────────────────── ↓11 ─╯
+ ╰───────────────────────────────────────────────────────────────────────── ↓9 ─╯
  ╭─ push ✗ failed ───────────────────────────────────────────────────── ! hide ─╮
  │ Pushing 5 branches to origin…                                                │
  │   auth/token-refresh   up to date                                            │

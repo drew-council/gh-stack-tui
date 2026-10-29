@@ -9,8 +9,8 @@
  │ [ ]        prev/next stack                                                   │
  │                                                                              │
  │ expand                                                                       │
- │ l → enter  expand / go into                                                  │
- │ h ←        collapse / go back                                                │
+ │ l → enter  one level in, opening it                                          │
+ │ h ←        one level out, closing it                                         │
  │ f          files                                                             │
  │ C          commits                                                           │
  │ x          CI checks                                                         │
@@ -45,7 +45,7 @@
  │                                                                              │
  │ symbols                                                                      │
  │ ● ○        checked out / other branch                                        │
- │ ◆          selected for review                                               │
+ │ ◆ ◇        selected: checked out / other                                     │
  │ ◎ ✓        in merge queue / merged                                           │
  │ ┊          needs a rebase onto its parent                                    │
  │ ✓ ✗ ●      checks passed / failed / running                                  │

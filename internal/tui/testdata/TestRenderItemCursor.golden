@@ -22,7 +22,7 @@
 ░│ │   ▸ 1 generated file                                                       │
 ░│ │ ▸ 4 commits                                                                │
 ░│ │ ▸ 6 checks                                                                 │
- │ │                                                                            │
+░│ │                                                                            │
  │ ○ auth/middleware                                                    +242 -6 │
  │ │ #104 Require a session on every API route                         approved │
  │ │ 1 unresolved                                                     ✓ passing │
@@ -36,5 +36,5 @@
  │ │ ▸ 2 files                                                                  │
  │ │ ▸ 2 commits                                                                │
  │ │ ▸ 3 checks                                                                 │
- ╰───────────────────────────────────────────────────────────────────────── ↓7 ─╯
-  j/k items  h back  o open  y copy  e edit  ? help
+ ╰───────────────────────────────────────────────────────────────────────── ↓5 ─╯
+  j/k items  h out  o open  y copy  e edit  ? help

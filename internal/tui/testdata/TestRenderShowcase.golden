@@ -29,7 +29,7 @@
 █│ │       ✓ build                                                              │
 █│ │   ▸ ● e2e                                                        1 running │
 █│ │   ▸ ✓ CodeQL                                                      1 passed │
- │ │                                                                            │
+█│ │                                                                            │
  │ ○ auth/middleware                                                    +242 -6 │
  │ │ #104 Require a session on every API route                         approved │
  │ │ 1 unresolved                                                     ✓ passing │
@@ -49,9 +49,7 @@
  │ │                                                                            │
  │ ── merged ────────────────────────────────────────────────────────────────── │
  │ ✓ auth/redis-sessions  #102 Back sessions with Redis                  merged │
- │ │                                                                            │
  │ ✓ auth/session-store  #101 Extract a session store interface          merged │
- │ │                                                                            │
  │ └ main                                                                       │
  │                                                                              │
  │                                                                              │
@@ -60,5 +58,7 @@
  │                                                                              │
  │                                                                              │
  │                                                                              │
+ │                                                                              │
+ │                                                                              │
  ╰──────────────────────────────────────────────────────────────────────────────╯
-  j/k move  l open  f/C/x files/commits/checks  o browser  c checkout  ? help
+  j/k move  l in  f/C/x files/commits/checks  o browser  c checkout  ? help

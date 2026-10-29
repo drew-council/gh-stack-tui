@@ -547,9 +547,11 @@ func (m Model) pickerLines(h int) []string {
 func (m Model) pickerItem(c candidate, cursor bool, loginW int) string {
 	s := m.st
 	lead := " "
+	// Picked people follow the stack's selection colors; see rowBg.
+	picked := slices.Contains(m.picker.picked, c.Login)
 	mark := s.dim.Render("·")
-	if slices.Contains(m.picker.picked, c.Login) {
-		mark = s.ok.Render("✓")
+	if picked {
+		mark = s.selection.Render("◆")
 	}
 	loginStyle := s.normal
 	if cursor {
@@ -569,8 +571,13 @@ func (m Model) pickerItem(c candidate, cursor bool, loginW int) string {
 		tags = append(tags, s.dim.Render(plural(c.RecentPRs, "recent PR", "recent PRs")))
 	}
 	line = fit(line, strings.Join(tags, s.dim.Render(" · ")), m.innerWidth())
-	if cursor {
-		line = shade(s.lift(line), s.cursorBg)
+	switch {
+	case cursor && picked:
+		return shade(s.lift(line), s.selCursorBg)
+	case cursor:
+		return shade(s.lift(line), s.cursorBg)
+	case picked:
+		return shade(line, s.selBg)
 	}
 	return line
 }

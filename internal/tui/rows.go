@@ -130,7 +130,10 @@ func (m *Model) buildRows() {
 				m.addChecks(add, i)
 			}
 		}
-		add(row{kind: rowSpacer, branch: i})
+		// Merged branches take one line each, with no gap.
+		if !merged {
+			add(row{kind: rowSpacer, branch: i})
+		}
 	}
 	add(row{kind: rowTrunk, branch: -1, label: m.snap.Trunk})
 }
@@ -386,16 +389,6 @@ func (m *Model) pageBranch(lines int) {
 	} else {
 		m.firstBranch()
 	}
-}
-
-// firstOpenSection returns the index of branch bi's first open section, or -1.
-func (m *Model) firstOpenSection(bi int) int {
-	for i := m.branchRow(bi) + 1; i > 0 && i < len(m.rows) && m.rows[i].branch == bi; i++ {
-		if r := m.rows[i]; r.kind == rowSection && m.expanded[r.key] {
-			return i
-		}
-	}
-	return -1
 }
 
 // nodeSpan returns the first line and the line after the last of branch bi's

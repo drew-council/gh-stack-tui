@@ -66,7 +66,7 @@ func (m Model) render() string {
 		}
 		foot = m.scrollHint(m.scroll, total, h)
 		if m.visual {
-			edge = m.st.bulletSelected
+			edge = m.st.selection
 		}
 	}
 	if len(body) > h {
@@ -313,10 +313,10 @@ func (m Model) bodyLines() []string {
 	hb := m.hoveredBranch()
 	var lines []string
 	for i, r := range m.rows {
-		active := r.branch >= 0 && r.branch == hb && r.kind != rowSpacer
+		active := r.branch >= 0 && r.branch == hb
 		bg := m.rowBg(i, active)
 		for _, l := range m.renderRow(r, active) {
-			if bg == s.cursorBg {
+			if bg == s.cursorBg || bg == s.selCursorBg {
 				l = s.lift(l)
 			}
 			lines = append(lines, shade(l, bg))
@@ -325,22 +325,40 @@ func (m Model) bodyLines() []string {
 	return lines
 }
 
-// rowBg is the background of row i. The hovered branch is shaded whole: in
-// the cursor color when the cursor is on the branch, and in the block color
-// around the cursor row when it is on one of the branch's items. Other
-// branches selected for review take the selection tint.
+// A branch's colors follow from three facts about it: whether it is selected
+// for review, where the cursor is, and its own state. Each mark answers one
+// question, so the facts never compete:
+//
+//   - Background, where is the cursor and what is selected: the cursor's row,
+//     or the whole branch when the cursor is on the branch, is gray, and
+//     brighter mauve when the branch is selected. The rest of the hovered
+//     branch is a faint gray, and other selected branches are mauve.
+//   - Bullet shape, what the branch is: ✓ merged, ◎ queued, ● checked out,
+//     ○ other. Selected branches become diamonds, ◆ checked out, ◇ other.
+//   - Bullet color: mauve when selected. Otherwise blue when checked out,
+//     peach when queued, green when merged, and gray.
+//   - Rail: peach and dashed when the branch needs a rebase, which outranks
+//     everything. Otherwise mauve when selected, blue when hovered, and gray.
+//   - Name: blue when checked out.
+//
+// Mauve means selected and nothing else.
+
+// rowBg is the background of row i.
 func (m Model) rowBg(i int, active bool) color.Color {
 	s := m.st
 	r := m.rows[i]
-	if r.branch < 0 || r.kind == rowSpacer {
+	if r.branch < 0 {
 		return nil
 	}
+	selected := m.isSelected(r.branch, m.snap.Branches[r.branch].Name)
 	cursor := i == m.cursor && m.navigable(i) ||
 		active && m.rows[m.cursor].kind == rowBranch
 	switch {
+	case cursor && selected:
+		return s.selCursorBg
 	case cursor:
 		return s.cursorBg
-	case m.isSelected(r.branch, m.snap.Branches[r.branch].Name):
+	case selected:
 		return s.selBg
 	case active:
 		return s.blockBg
@@ -351,40 +369,38 @@ func (m Model) rowBg(i int, active bool) color.Color {
 // parts is a line's left-aligned content and its right-aligned value.
 type parts struct{ left, right string }
 
-// connector returns the tree line for branch bi and its style: peach and
-// dashed when the branch needs a rebase, else accent for the active branch.
+// connector returns branch bi's rail and its style.
 func (m Model) connector(bi int, active bool) (string, lipgloss.Style) {
 	s := m.st
 	b := m.snap.Branches[bi]
 	pr := m.prFor(bi)
-	if b.NeedsRebase && !m.merged(bi) && (pr == nil || !pr.Queued) {
+	switch {
+	case b.NeedsRebase && !m.merged(bi) && (pr == nil || !pr.Queued):
 		return glyphDashed, s.connDashed
-	}
-	if active {
+	case m.isSelected(bi, b.Name):
+		return glyphConn, s.selection
+	case active:
 		return glyphConn, s.connActive
 	}
 	return glyphConn, s.conn
 }
 
-// bullet marks branch bi on the tree: selected, checked out, merged, queued,
-// or plain.
-func (m Model) bullet(bi int, active bool) string {
+// bullet is branch bi's mark on the tree.
+func (m Model) bullet(bi int) string {
 	s := m.st
 	b := m.snap.Branches[bi]
 	pr := m.prFor(bi)
 	switch {
-	case m.isSelected(bi, b.Name) && b.IsCurrent:
-		return s.bulletCurrent.Render(glyphSelected)
-	case m.isSelected(bi, b.Name):
-		return s.bulletSelected.Render(glyphSelected)
-	case b.IsCurrent:
-		return s.bulletCurrent.Render(glyphCurrent)
 	case m.merged(bi):
 		return s.bulletMerged.Render(glyphMerged)
+	case m.isSelected(bi, b.Name) && b.IsCurrent:
+		return s.selection.Render(glyphSelectedCurrent)
+	case m.isSelected(bi, b.Name):
+		return s.selection.Render(glyphSelected)
+	case b.IsCurrent:
+		return s.bulletCurrent.Render(glyphCurrent)
 	case pr != nil && pr.Queued:
 		return s.bulletQueued.Render(glyphQueued)
-	case active:
-		return s.connActive.Render(glyphBranch)
 	}
 	return s.dim.Render(glyphBranch)
 }
@@ -493,7 +509,7 @@ func (m Model) renderBranch(r row, active bool) []string {
 	for i, p := range m.branchParts(r.branch) {
 		mark := cs.Render(conn)
 		if i == 0 {
-			mark = m.bullet(r.branch, active)
+			mark = m.bullet(r.branch)
 		}
 		lines = append(lines, fit(lead+mark+" "+p.left, p.right, w))
 	}
@@ -518,7 +534,7 @@ func (m Model) branchParts(bi int) []parts {
 				left += " " + s.dim.Render(pr.Title)
 			}
 		}
-		return []parts{{left, s.info.Render("merged")}}
+		return []parts{{left, s.dim.Render("merged")}}
 	}
 
 	name := s.branch.Render(b.Name)
@@ -572,7 +588,7 @@ func (m Model) prState(bi int) string {
 	}
 	switch {
 	case pr.Merged:
-		return s.info.Render("merged")
+		return s.dim.Render("merged")
 	case pr.Queued:
 		return s.warn.Render("queued")
 	case pr.State == "CLOSED":
@@ -912,12 +928,17 @@ func (m Model) footerText() string {
 		)
 	}
 	if r, ok := m.hovered(); ok && r.item() {
-		return m.hints(
-			"j/k", "items", "h", "back", "o", "open", "y", "copy", "e", "edit", "?", "help",
-		)
+		// l only goes in from a section or group.
+		in := []string{"l", "in"}
+		if r.kind != rowSection && r.kind != rowWorkflow && r.kind != rowGenerated {
+			in = nil
+		}
+		pairs := append([]string{"j/k", "items"}, in...)
+		return m.hints(append(pairs,
+			"h", "out", "o", "open", "y", "copy", "e", "edit", "?", "help")...)
 	}
 	return m.hints(
-		"j/k", "move", "l", "open", "f/C/x", "files/commits/checks", "o", "browser",
+		"j/k", "move", "l", "in", "f/C/x", "files/commits/checks", "o", "browser",
 		"c", "checkout", "p", "push", "s", "sync", "R", "review", "?", "help",
 	)
 }

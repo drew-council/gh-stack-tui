@@ -8,7 +8,7 @@
 █│ │ ▸ 1 file                                                                   │
 █│ │ ▸ 1 commit                                                                 │
 █│ │ ▸ 3 checks                                                                 │
- │ │                                                                            │
+█│ │                                                                            │
  │ └ main                                                                       │
  │                                                                              │
  │                                                                              │
@@ -27,4 +27,4 @@
  │                                                                              │
  │                                                                              │
  ╰──────────────────────────────────────────────────────────────────────────────╯
-  j/k move  l open  f/C/x files/commits/checks  o browser  c checkout  ? help
+  j/k move  l in  f/C/x files/commits/checks  o browser  c checkout  ? help

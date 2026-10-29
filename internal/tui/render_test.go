@@ -58,7 +58,7 @@ func update(m Model, msg tea.Msg) Model {
 // files, checks with one workflow expanded, and the commits of the branch
 // below.
 func TestRenderShowcase(t *testing.T) {
-	m := press(demoModel(t, 80, 64), "x", "l", "j", "l", "J", "C", "K", "f")
+	m := press(demoModel(t, 80, 64), "x", "l", "j", "j", "l", "l", "J", "C", "K", "f")
 	onBranch(t, m, demo.CurrentBranch)
 	assertScreen(t, m)
 }
@@ -88,6 +88,11 @@ func TestRenderItemCursor(t *testing.T) {
 
 func TestRenderSelection(t *testing.T) {
 	assertScreen(t, press(demoModel(t, 80, 40), "K", "v", "J", "J"))
+}
+
+// The checked out branch is marked, and the cursor moves on to an unmarked one.
+func TestRenderMarks(t *testing.T) {
+	assertScreen(t, press(demoModel(t, 80, 40), "K", "space", "space"))
 }
 
 func TestRenderOtherStack(t *testing.T) {

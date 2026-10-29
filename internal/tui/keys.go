@@ -44,8 +44,8 @@ var helpSections = []helpSection{
 		{"[ ]", "prev/next stack"},
 	}},
 	{"expand", [][2]string{
-		{"l → enter", "expand / go into"},
-		{"h ←", "collapse / go back"},
+		{"l → enter", "one level in, opening it"},
+		{"h ←", "one level out, closing it"},
 		{"f", "files"},
 		{"C", "commits"},
 		{"x", "CI checks"},
@@ -80,7 +80,7 @@ var helpSections = []helpSection{
 	}},
 	{"symbols", [][2]string{
 		{"● ○", "checked out / other branch"},
-		{"◆", "selected for review"},
+		{"◆ ◇", "selected: checked out / other"},
 		{"◎ ✓", "in merge queue / merged"},
 		{"┊", "needs a rebase onto its parent"},
 		{"✓ ✗ ●", "checks passed / failed / running"},
@@ -363,9 +363,9 @@ func (m *Model) rebuild() {
 	m.restoreCursor(fallback)
 }
 
-// expand is l and enter. On a branch it goes into the branch's first open
-// section, and opens every section when none is. On a section or workflow it
-// toggles what is under it. Enter on any other item opens it.
+// expand is l and enter, and goes one level in. On a branch it moves onto the
+// branch's first section. On a section, workflow, or generated group it opens
+// it and moves onto its first entry. Enter on any other item opens it.
 func (m *Model) expand(enter bool) tea.Cmd {
 	r, ok := m.hovered()
 	if !ok {
@@ -373,27 +373,28 @@ func (m *Model) expand(enter bool) tea.Cmd {
 	}
 	switch r.kind {
 	case rowBranch:
-		if i := m.firstOpenSection(r.branch); i >= 0 {
+		if i := m.cursor + 1; i < len(m.rows) && m.rows[i].kind == rowSection {
 			m.setCursor(i)
-			return nil
 		}
-		m.setBranchExpanded(m.snap.Branches[r.branch].Name, true)
 	case rowSection, rowWorkflow, rowGenerated:
-		m.expanded[r.key] = !m.expanded[r.key]
+		m.expanded[r.key] = true
+		m.rebuild()
+		if i := m.cursor + 1; i < len(m.rows) && m.rows[i].item() &&
+			m.parentKey(m.rows[i]) == r.key {
+			m.setCursor(i)
+		}
 	default:
 		if enter {
 			return m.openHovered()
 		}
-		return nil
 	}
-	m.rebuild()
 	return nil
 }
 
-// collapse is h. On a branch it closes every section, and on an open section,
-// workflow, or generated group it closes it. From a closed section it goes
-// back to the branch, and from anything else it closes the group the item is
-// in and parks on it.
+// collapse is h, and goes one level out, the reverse of expand. From an entry
+// it closes the group the entry is in and moves onto it, and from a section
+// it goes back to the branch. An open group under the cursor closes first. On
+// a branch it closes every section.
 func (m *Model) collapse() {
 	r, ok := m.hovered()
 	if !ok {

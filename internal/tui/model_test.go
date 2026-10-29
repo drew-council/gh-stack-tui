@@ -128,14 +128,15 @@ func onBranch(t *testing.T, m Model, name string) {
 // testdata/<test name>.golden. Run go test with -update to rewrite it.
 //
 // Each line starts with a mark for its background, which color would show:
-// █ the cursor, ░ the rest of the hovered branch, ▒ a branch selected for
-// review, and a space for none.
+// █ the cursor, ░ the rest of the hovered branch, ▓ the cursor on a branch
+// selected for review, ▒ a selected branch, and a space for none.
 func assertScreen(t *testing.T, m Model) {
 	t.Helper()
 	marks := []struct {
 		bg   color.Color
 		mark string
 	}{
+		{m.st.selCursorBg, "▓"},
 		{m.st.selBg, "▒"},
 		{m.st.cursorBg, "█"},
 		{m.st.blockBg, "░"},
@@ -164,7 +165,7 @@ func TestRowsTopFirstWithMergedSeparator(t *testing.T) {
 		rowBranch, rowSpacer, // four
 		rowBranch, rowSection, rowSpacer, // three: files
 		rowBranch, rowSection, rowSection, rowSection, rowSpacer, // two: files, commits, checks
-		rowSeparator, rowBranch, rowSpacer, // one (merged)
+		rowSeparator, rowBranch, // one (merged), on one line
 		rowTrunk,
 	}
 	if len(kinds) != len(want) {
@@ -201,43 +202,48 @@ func TestJKMoveBetweenBranchesOnly(t *testing.T) {
 }
 
 func TestDescendIntoItemsAndBack(t *testing.T) {
-	m := press(testModel(), "f", "l")
-	if r := hovered(t, m); r.kind != rowSection || r.section != secFiles {
-		t.Fatalf("l should go into the branch, onto its files, got %+v", r)
+	section := func(m Model, name string, open bool) {
+		t.Helper()
+		if r := hovered(
+			t,
+			m,
+		); r.kind != rowSection || r.section != name ||
+			m.expanded[r.key] != open {
+			t.Fatalf("expected the %s section, open %v, got %+v", name, open, r)
+		}
 	}
+	// l goes one level in: onto the sections, then into one, opening it.
+	m := press(testModel(), "l")
+	section(m, secFiles, false)
+	m = press(m, "l")
+	if r := hovered(
+		t,
+		m,
+	); r.kind != rowFile || r.file.Path != "a.go" ||
+		!m.expanded[sectionKey("two", secFiles)] {
+		t.Fatalf("l on the files should open them and go onto a.go, got %+v", r)
+	}
+	// j steps through the files and on to the next section, and stays on
+	// the last item.
 	m = press(m, "j", "j")
-	if r := hovered(t, m); r.kind != rowFile || r.file.Path != "b.go" {
-		t.Fatalf("j should step through the files to b.go, got %+v", r)
-	}
-	m = press(m, "j")
-	if r := hovered(t, m); r.kind != rowSection || r.section != secCommits {
-		t.Fatalf("j should step from the last file to the commits, got %+v", r)
-	}
-	// j on the last item stays.
+	section(m, secCommits, false)
 	m = press(m, "j", "j")
-	if r := hovered(t, m); r.kind != rowSection || r.section != secChecks {
-		t.Fatalf("j on the last item should stay, got %+v", r)
-	}
-	// h on a file closes its section and parks on it; h again goes back to
-	// the branch.
+	section(m, secChecks, false)
+	// h goes one level out: from a file it closes the files and goes onto
+	// them, then back to the branch.
 	m = press(m, "k", "k", "h")
-	if r := hovered(t, m); r.kind != rowSection || r.section != secFiles || m.expanded[r.key] {
-		t.Fatalf("h on a file should close its section and park on it, got %+v", r)
-	}
+	section(m, secFiles, false)
 	m = press(m, "h")
-	onBranch(t, m, "two")
-	m = press(m, "f", "l", "k")
 	onBranch(t, m, "two")
 	// h on a branch closes all of its sections.
-	m = press(m, "h")
+	m = press(m, "f", "C", "h")
 	if m.branchExpanded("two") {
 		t.Fatal("h on a branch should close its sections")
 	}
-	// Checks: l goes into the open checks, l on the workflow opens it, j
-	// reaches the check, and h closes the workflow.
-	m = press(m, "x", "l", "j")
+	// Checks nest one level deeper, and h backs out the same way.
+	m = press(m, "l", "j", "j", "l")
 	if r := hovered(t, m); r.kind != rowWorkflow {
-		t.Fatalf("expected the workflow, got %+v", r)
+		t.Fatalf("l on the checks should go onto the workflow, got %+v", r)
 	}
 	m = press(m, "l", "j")
 	if r := hovered(t, m); r.kind != rowCheck || r.check.Name != "test" {
@@ -247,13 +253,15 @@ func TestDescendIntoItemsAndBack(t *testing.T) {
 	if r := hovered(t, m); r.kind != rowWorkflow || m.expanded[r.key] {
 		t.Fatalf("h on a check should close the workflow and park on it, got %+v", r)
 	}
+	m = press(m, "h")
+	section(m, secChecks, false)
+	m = press(m, "h")
+	onBranch(t, m, "two")
 	// Closing the section from inside puts the cursor on the section.
-	m = press(m, "x")
-	if r := hovered(t, m); r.kind != rowSection || r.section != secChecks {
-		t.Fatalf("closing the checks from inside should park on them, got %+v", r)
-	}
+	m = press(m, "l", "j", "j", "l", "x")
+	section(m, secChecks, false)
 	// J and K leave the items for the neighbouring branches.
-	m = press(m, "f", "l", "K")
+	m = press(m, "K")
 	onBranch(t, m, "three")
 }
 
@@ -495,8 +503,8 @@ func TestGeneratedFilesGroupedAndCollapsible(t *testing.T) {
 		t.Fatalf("expected collapsed generated group of 2, got %+v", r)
 	}
 
-	// Expanding the generated subgroup reveals the generated files at indent 6.
-	m = press(m, "l", "j")
+	// l opens the generated subgroup and goes onto its first file.
+	m = press(m, "l")
 	if r := hovered(t, m); r.kind != rowFile || r.file.Path != "a.pb.go" {
 		t.Fatalf("expected first generated file, got %+v", r)
 	}

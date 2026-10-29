@@ -23,8 +23,8 @@
 █│ │ ▸ 3 files + 1 generated                            │
 █│ │ ▸ 3 commits                                        │
 █│ │ ▸ 4 checks                                         │
- │ │                                                    │
- ╰───────────────────────────────────────────── ↑4 ↓14 ─╯
+█│ │                                                    │
+ ╰───────────────────────────────────────────── ↑4 ↓12 ─╯
   merge #104 and 1 PR below it?
   y last-used method  s squash  m merge commit  r rebase
   n no

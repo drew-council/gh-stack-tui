@@ -19,11 +19,8 @@ type styles struct {
 	green, yellow, peach, mauve        color.Color
 	red, teal, onFill                  color.Color
 
-	// Backgrounds. The row under the cursor, or the whole hovered branch, is
-	// cursorBg; the rest of a branch whose item is hovered is blockBg, a step
-	// fainter so the cursor row stands out. Branches selected for review are
-	// selBg, a hue apart from the cursor.
-	blockBg, cursorBg, selBg color.Color
+	// Backgrounds. See rowBg for when each is used.
+	blockBg, cursorBg, selBg, selCursorBg color.Color
 
 	normal lipgloss.Style // primary ink
 	dim    lipgloss.Style // secondary ink: labels, hints, timestamps
@@ -40,10 +37,11 @@ type styles struct {
 	trunk         lipgloss.Style
 	prNum         lipgloss.Style
 
-	bulletCurrent  lipgloss.Style
-	bulletSelected lipgloss.Style
-	bulletMerged   lipgloss.Style
-	bulletQueued   lipgloss.Style
+	bulletCurrent lipgloss.Style
+	bulletMerged  lipgloss.Style
+	bulletQueued  lipgloss.Style
+
+	selection lipgloss.Style // marks of a branch selected for review
 
 	add lipgloss.Style
 	del lipgloss.Style
@@ -53,7 +51,6 @@ type styles struct {
 	warn lipgloss.Style
 	err  lipgloss.Style
 	bot  lipgloss.Style // comments from bots such as Copilot
-	info lipgloss.Style // merged and other settled states
 
 	selected lipgloss.Style // pill for the selection mode
 	note     lipgloss.Style // flash that is neither success nor error
@@ -89,6 +86,7 @@ func newStyles() styles {
 	}
 	s.blockBg = blend(c(f.Base()), c(f.Surface0()), 0.5)
 	s.selBg = blend(c(f.Base()), s.mauve, 0.18)
+	s.selCursorBg = blend(c(f.Base()), s.mauve, 0.34)
 	fg := func(col color.Color) lipgloss.Style { return lipgloss.NewStyle().Foreground(col) }
 
 	s.normal = fg(s.text)
@@ -106,8 +104,8 @@ func newStyles() styles {
 	s.prNum = fg(s.faint)
 
 	s.bulletCurrent = fg(s.accent)
-	s.bulletSelected = fg(s.mauve)
-	s.bulletMerged = fg(s.mauve)
+	s.selection = fg(s.mauve)
+	s.bulletMerged = fg(s.green)
 	s.bulletQueued = fg(s.peach)
 
 	s.add = fg(s.green)
@@ -118,7 +116,6 @@ func newStyles() styles {
 	s.warn = fg(s.peach)
 	s.err = fg(s.red)
 	s.bot = fg(s.teal)
-	s.info = fg(s.mauve)
 
 	s.selected = lipgloss.NewStyle().
 		Foreground(s.onFill).
@@ -180,16 +177,17 @@ func blend(base, top color.Color, t float64) color.Color {
 }
 
 const (
-	glyphBranch    = "○"
-	glyphCurrent   = "●"
-	glyphSelected  = "◆"
-	glyphMerged    = "✓"
-	glyphQueued    = "◎"
-	glyphCollapsed = "▸"
-	glyphExpanded  = "▾"
-	glyphTrunk     = "└"
-	glyphConn      = "│"
-	glyphDashed    = "┊"
+	glyphBranch          = "○"
+	glyphCurrent         = "●"
+	glyphSelectedCurrent = "◆"
+	glyphSelected        = "◇"
+	glyphMerged          = "✓"
+	glyphQueued          = "◎"
+	glyphCollapsed       = "▸"
+	glyphExpanded        = "▾"
+	glyphTrunk           = "└"
+	glyphConn            = "│"
+	glyphDashed          = "┊"
 )
 
 func (s styles) checkGlyph(st github.CheckState) string {

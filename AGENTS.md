@@ -28,7 +28,7 @@ go test ./internal/tui -update
 
 Then read the `git diff` of `testdata` and confirm every change is intended. Never run `-update` just to make a failing test pass. Pass `-update` to `internal/tui` only; packages without golden files reject the flag.
 
-Goldens have no color, so each line starts with a mark for its background: `█` the cursor, `░` the rest of the hovered branch, `▒` a branch selected for review.
+Goldens have no color, so each line starts with a mark for its background: `█` the cursor, `░` the rest of the hovered branch, `▓` the cursor on a selected branch, `▒` a selected branch. Which color a branch gets is decided in one place, the comment above `rowBg` in `internal/tui/view.go`; keep it the single source.
 
 ### Looking at the UI
 

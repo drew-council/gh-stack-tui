@@ -3,27 +3,27 @@
  │ │ ▸ 1 file                                                                   │
  │ │ ▸ 1 commit                                                                 │
  │ │                                                                            │
-▒│ ◆ auth/audit-log                                                     +106 -2 │
+▒│ ◇ auth/audit-log                                                     +106 -2 │
 ▒│ ┊ #106 Write an audit log entry for each login                         draft │
 ▒│ ┊ needs rebase                                                   ● 2 running │
 ▒│ ┊ ▸ 2 files                                                                  │
 ▒│ ┊ ▸ 1 commit                                                                 │
 ▒│ ┊ ▸ 3 checks                                                                 │
- │ ┊                                                                            │
+▒│ ┊                                                                            │
 ▒│ ◆ auth/rate-limit                                                   +394 -83 │
 ▒│ │ #105 Rate limit login attempts per account               changes requested │
 ▒│ │ conflicts · 3 unresolved · 1 bot                   ✗ 2 failing ● 1 running │
 ▒│ │ ▸ 5 files + 1 generated                                                    │
 ▒│ │ ▸ 4 commits                                                                │
 ▒│ │ ▸ 6 checks                                                                 │
- │ │                                                                            │
-█│ ◆ auth/middleware                                                    +242 -6 │
-█│ │ #104 Require a session on every API route                         approved │
-█│ │ 1 unresolved                                                     ✓ passing │
-█│ │ ▸ 3 files + 1 generated                                                    │
-█│ │ ▸ 3 commits                                                                │
-█│ │ ▸ 4 checks                                                                 │
- │ │                                                                            │
+▒│ │                                                                            │
+▓│ ◇ auth/middleware                                                    +242 -6 │
+▓│ │ #104 Require a session on every API route                         approved │
+▓│ │ 1 unresolved                                                     ✓ passing │
+▓│ │ ▸ 3 files + 1 generated                                                    │
+▓│ │ ▸ 3 commits                                                                │
+▓│ │ ▸ 4 checks                                                                 │
+▓│ │                                                                            │
  │ ◎ auth/token-refresh                                                +184 -12 │
  │ │ #103 Refresh access tokens before they expire                       queued │
  │ │                                                                  ✓ passing │
@@ -33,8 +33,8 @@
  │ │                                                                            │
  │ ── merged ────────────────────────────────────────────────────────────────── │
  │ ✓ auth/redis-sessions  #102 Back sessions with Redis                  merged │
- │ │                                                                            │
  │ ✓ auth/session-store  #101 Extract a session store interface          merged │
- │ │                                                                            │
- ╰───────────────────────────────────────────────────────────────────────── ↓1 ─╯
+ │ └ main                                                                       │
+ │                                                                              │
+ ╰──────────────────────────────────────────────────────────────────────────────╯
    visual  3  R review  D draft/ready  A reviewers  space mark  esc clear

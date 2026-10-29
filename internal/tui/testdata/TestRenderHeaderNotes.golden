@@ -18,7 +18,7 @@
 █│ │ ▸ 5 files + 1 generated                                                    │
 █│ │ ▸ 4 commits                                                                │
 █│ │ ▸ 6 checks                                                                 │
- │ │                                                                            │
+█│ │                                                                            │
  │ ○ auth/middleware                                                    +242 -6 │
  │ │ #104 Require a session on every API route                         approved │
  │ │ 1 unresolved                                                     ✓ passing │
@@ -26,5 +26,5 @@
  │ │ ▸ 3 commits                                                                │
  │ │ ▸ 4 checks                                                                 │
  │ │                                                                            │
- ╰──────────────────────────────────────────────────────────────────────── ↓13 ─╯
-  j/k move  l open  f/C/x files/commits/checks  o browser  c checkout  ? help
+ ╰──────────────────────────────────────────────────────────────────────── ↓11 ─╯
+  j/k move  l in  f/C/x files/commits/checks  o browser  c checkout  ? help

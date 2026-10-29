@@ -26,7 +26,7 @@
 █│ │   0f1e2d3 Limit attempts per account, not per IP                                                            4h ago │
 █│ │   7a6b5c4 Add a token bucket limiter                                                                       22h ago │
 █│ │ ▸ 6 checks                                                                                                         │
- │ │                                                                                                                    │
+█│ │                                                                                                                    │
  │ ○ auth/middleware                                                                                            +242 -6 │
  │ │ #104 Require a session on every API route                                                                 approved │
  │ │ 1 unresolved                                                                                             ✓ passing │
@@ -36,5 +36,5 @@
  │ │                                                                                                                    │
  │ ◎ auth/token-refresh                                                                                        +184 -12 │
  │ │ #103 Refresh access tokens before they expire                                                               queued │
- ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────── ↓11 ─╯
-  j/k move  l open  f/C/x files/commits/checks  o browser  c checkout  p push  s sync  R review  ? help
+ ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────── ↓9 ─╯
+  j/k move  l in  f/C/x files/commits/checks  o browser  c checkout  p push  s sync  R review  ? help

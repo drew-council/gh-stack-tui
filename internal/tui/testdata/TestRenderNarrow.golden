@@ -25,7 +25,7 @@
 █│ │   ▸ 1 generated file                               │
 █│ │ ▸ 4 commits                                        │
 █│ │ ▸ 6 checks                                         │
- │ │                                                    │
+█│ │                                                    │
  │ ○ auth/middleware                            +242 -6 │
  │ │ #104 Require a session on every API route          │
  │ │                                           approved │
@@ -36,5 +36,5 @@
  │ │                                                    │
  │ ◎ auth/token-refresh                        +184 -12 │
  │ │ #103 Refresh access tokens before they expire      │
- ╰──────────────────────────────────────────────── ↓12 ─╯
-  j/k move  l open  f/C/x files/commits/checks  ? help
+ ╰──────────────────────────────────────────────── ↓10 ─╯
+  j/k move  l in  f/C/x files/commits/checks  ? help
