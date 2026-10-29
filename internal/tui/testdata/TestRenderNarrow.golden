@@ -1,0 +1,40 @@
+gh stack #7 1/2  on main · 7 branches (2 merged) · at a…
+
+├ auth/docs  +40 -3
+│  ▸ 1 file changed
+│  ▸ 1 commit
+│
+├ ⚠ #106 DRAFT  ● checks  Write an audit log entry for …
+┊ auth/audit-log  +106 -2
+┊  ▸ 2 files changed
+┊  ▸ 1 commit
+┊  ▸ 3 checks  2 running · 1 passed
+┊
+▶ ○ #105 OPEN  ✗ checks  conflicts  Rate limit login at…
+│ auth/rate-limit (current)  +394 -83
+│ changes requested · 3 unresolved comments · 1 bot com…
+│  ▾ 5 files changed
+│    …rnal/ratelimit/limiter.go  +156 -0
+│    …ratelimit/limiter_test.go  +210 -0
+│    internal/auth/login.go  +22 -8
+│    config/defaults.yaml  +6 -1
+│    internal/auth/lockout.go  +0 -74
+│    ▸ 1 generated file
+│  ▸ 4 commits
+│  ▸ 6 checks  2 failed · 1 running · 3 passed
+│
+├ ○ #104 OPEN  ✓ checks  Require a session on every API…
+│ auth/middleware  +242 -6
+│ approved · 1 unresolved comment
+│  ▸ 3 files changed
+│  ▸ 3 commits
+│  ▸ 4 checks  4 passed
+│
+├ ◎ #103 QUEUED  Refresh access tokens before they expi…
+│ auth/token-refresh  +184 -12
+│ approved
+│  ▸ 2 files changed
+│  ▸ 2 commits
+│  ▸ 3 checks  3 passed
+│
+j/k navigate  l/h expand  o open  y copy  c checkout  p…

@@ -1,0 +1,30 @@
+gh stack #8 2/2  on main · 2 branches · at auth/rate-limit · pinned    ↻ 12s ago
+
+├ ○ #111 CLOSED  Retry failed webhooks with backoff
+│ billing/webhooks  no local branch
+│
+▶ ○ #110 OPEN  ✓ checks  behind base  Generate monthly invoices
+│ billing/invoices  +230 -0
+│ ready for review
+│  ▸ 1 file changed
+│  ▸ 1 commit
+│  ▸ 3 checks  3 passed
+│
+└ main
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+j/k navigate  l/h expand  o open  y copy  c checkout  p push  s sync  R review …

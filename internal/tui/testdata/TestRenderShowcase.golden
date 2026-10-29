@@ -1,0 +1,64 @@
+gh stack #7 1/2  on main · 7 branches (2 merged) · at auth/rate-limit  ↻ 12s ago
+
+├ auth/docs  +40 -3
+│  ▸ 1 file changed
+│  ▸ 1 commit
+│
+├ ⚠ #106 DRAFT  ● checks  Write an audit log entry for each login
+┊ auth/audit-log  +106 -2
+┊  ▸ 2 files changed
+┊  ▸ 1 commit
+┊  ▸ 3 checks  2 running · 1 passed
+┊
+▶ ○ #105 OPEN  ✗ checks  conflicts  Rate limit login attempts per account
+│ auth/rate-limit (current)  +394 -83
+│ changes requested · 3 unresolved comments · 1 bot comment
+│  ▾ 5 files changed
+│    internal/ratelimit/limiter.go  +156 -0
+│    internal/ratelimit/limiter_test.go  +210 -0
+│    internal/auth/login.go  +22 -8
+│    config/defaults.yaml  +6 -1
+│    internal/auth/lockout.go  +0 -74
+│    ▸ 1 generated file
+│  ▸ 4 commits
+│  ▾ 6 checks  2 failed · 1 running · 3 passed
+│    ✗ ci  2 failed · 2 passed
+│      ✓ lint
+│      ✗ test (ubuntu-latest)
+│      ✗ test (macos-latest)
+│      ✓ build
+│    ● e2e  1 running
+│    ✓ CodeQL  1 passed
+│
+├ ○ #104 OPEN  ✓ checks  Require a session on every API route
+│ auth/middleware  +242 -6
+│ approved · 1 unresolved comment
+│  ▸ 3 files changed
+│  ▾ 3 commits
+│    c41a09e Regenerate the OpenAPI client  5 hours ago
+│    e7d2f30 Exempt health checks from the session check  6 hours ago
+│    1a2b3c4 Require a session on every API route  20 hours ago
+│  ▸ 4 checks  4 passed
+│
+├ ◎ #103 QUEUED  Refresh access tokens before they expire
+│ auth/token-refresh  +184 -12
+│ approved
+│  ▸ 2 files changed
+│  ▸ 2 commits
+│  ▸ 3 checks  3 passed
+│
+──── merged ─────
+├ ✓ #102 MERGED  Back sessions with Redis
+│ auth/redis-sessions
+│
+├ ✓ #101 MERGED  Extract a session store interface
+│ auth/session-store
+│
+└ main
+
+
+
+
+
+
+j/k navigate  l/h expand  o open  y copy  c checkout  p push  s sync  R review …

@@ -18,7 +18,7 @@ The model reads stacks through the `Local` interface and PRs through `Remote` (`
 
 Run `go test ./...` before finishing a change.
 
-Tests that assert the whole screen MUST use `assertScreen` in `internal/tui/model_test.go`. It compares the rendered screen, without color, to `internal/tui/testdata/<TestName>.golden`. Tests that check for one piece of text SHOULD keep using `strings.Contains`.
+Rendering tests SHOULD start from `demoModel` in `internal/tui/render_test.go`, which loads the demo stacks through the real loading path on a fixed clock. Tests that assert the whole screen MUST use `assertScreen` in `internal/tui/model_test.go`. It compares the rendered screen, without color, to `internal/tui/testdata/<TestName>.golden`. Tests that check for one piece of text SHOULD keep using `strings.Contains`.
 
 When a UI change is intended, rewrite the golden files:
 
