@@ -175,7 +175,8 @@ func (m *Model) nextWizardStep() tea.Cmd {
 		}
 		m.mode = modeConfirm
 		m.confirm = &confirmState{
-			text: text + "  [y]es  [n]o",
+			text: text,
+			keys: []string{"y", "yes", "n", "no"},
 			actions: map[string]func(*Model) tea.Cmd{
 				"y": func(m *Model) tea.Cmd {
 					title, name, args := draftToggle(n, true)
@@ -345,11 +346,11 @@ func (m Model) handlePickerKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			last := m.wizard.i+1 >= len(m.wizard.steps)
 			cmd := m.advanceWizard()
 			if last {
-				return m, combine(cmd, m.setFlash("cancelled", false))
+				return m, combine(cmd, m.setNote("cancelled"))
 			}
 			return m, cmd
 		}
-		return m, m.setFlash("cancelled", false)
+		return m, m.setNote("cancelled")
 	case "up", "ctrl+p", "ctrl+k":
 		p.move(-1)
 	case "down", "ctrl+n", "ctrl+j":
@@ -505,11 +506,11 @@ func (m Model) pickerLines(h int) []string {
 		selected = s.dim.Render("picked ") + strings.Join(pills, " ")
 	}
 	lines := []string{
-		"  " + s.title.Render(p.subject),
-		"  " + s.dim.Render(p.context),
+		" " + s.title.Render(p.subject),
+		" " + s.dim.Render(p.context),
 		"",
-		fit("  "+s.prompt.Render("> ")+m.input.View(), count, w),
-		"  " + selected,
+		fit(" "+s.prompt.Render("> ")+m.input.View(), count, w),
+		" " + selected,
 		"",
 	}
 
@@ -519,17 +520,17 @@ func (m Model) pickerLines(h int) []string {
 	switch {
 	case m.reviewersErr != nil && !m.reviewersLoaded:
 		status = []string{
-			"  " + s.err.Render("loading reviewers failed: "+firstLine(m.reviewersErr.Error())),
-			"  " + s.dim.Render(
+			" " + s.err.Render("loading reviewers failed: "+firstLine(m.reviewersErr.Error())),
+			" " + s.dim.Render(
 				"retrying on the next refresh; ctrl+s marks ready without reviewers",
 			),
 		}
 	case !m.reviewersLoaded:
-		status = []string{"  " + m.spinner.View() + s.dim.Render(" loading reviewers…")}
+		status = []string{" " + m.spinner.View() + s.dim.Render(" loading reviewers…")}
 	case len(p.all) == 0:
-		status = []string{"  " + s.dim.Render("nobody can be requested in this repository")}
+		status = []string{" " + s.dim.Render("nobody can be requested in this repository")}
 	case len(p.shown) == 0:
-		status = []string{"  " + s.dim.Render("no match")}
+		status = []string{" " + s.dim.Render("no match")}
 	}
 
 	loginW := 0
@@ -545,10 +546,7 @@ func (m Model) pickerLines(h int) []string {
 
 func (m Model) pickerItem(c candidate, cursor bool, loginW int) string {
 	s := m.st
-	lead := "  "
-	if cursor {
-		lead = s.cursor.Render(glyphCursor) + " "
-	}
+	lead := " "
 	mark := s.dim.Render("·")
 	if slices.Contains(m.picker.picked, c.Login) {
 		mark = s.ok.Render("✓")
@@ -572,7 +570,7 @@ func (m Model) pickerItem(c candidate, cursor bool, loginW int) string {
 	}
 	line = fit(line, strings.Join(tags, s.dim.Render(" · ")), m.innerWidth())
 	if cursor {
-		line = s.highlight(line)
+		line = shade(s.lift(line), s.cursorBg)
 	}
 	return line
 }

@@ -9,9 +9,9 @@ type rowKind int
 
 const (
 	rowBranch rowKind = iota
-	// rowSections lists a branch's files, commits, and checks on one line.
-	// Open sections show their items under it.
-	rowSections
+	// rowSection heads a branch's files, commits, or checks. An open section
+	// shows its items under it.
+	rowSection
 	rowFile
 	rowGenerated
 	rowCommit
@@ -22,7 +22,8 @@ const (
 	rowTrunk
 )
 
-// Sections in the order they show under a branch.
+// Sections in the order they show under a branch. Each name is also the path
+// of its tab on the PR's page.
 const (
 	secFiles   = "files"
 	secCommits = "commits"
@@ -50,11 +51,11 @@ type row struct {
 	y        int // first line of the row within the body
 }
 
-// item reports whether the row is a file, commit, workflow, or check: the
-// rows inside a branch that can be focused after descending into it.
+// item reports whether the row is a section, file, commit, workflow, or
+// check: the rows inside a branch that can be focused after descending into it.
 func (r row) item() bool {
 	switch r.kind {
-	case rowFile, rowGenerated, rowCommit, rowWorkflow, rowCheck:
+	case rowSection, rowFile, rowGenerated, rowCommit, rowWorkflow, rowCheck:
 		return true
 	}
 	return false
@@ -100,81 +101,88 @@ func (m *Model) buildRows() {
 			branch: i,
 			height: len(m.branchParts(i)),
 		})
-		if len(m.sectionSegments(i)) > 0 {
-			add(row{kind: rowSections, key: "sections\x00" + b.Name, branch: i})
-		}
-
-		if m.expanded[sectionKey(b.Name, secFiles)] {
-			gen := 0
-			for fi := range b.Files {
-				f := &b.Files[fi]
-				if f.Generated {
-					gen++
-					continue
-				}
-				add(
-					row{
-						kind:   rowFile,
-						key:    "file\x00" + b.Name + "\x00" + f.Path,
-						branch: i,
-						file:   f,
-					},
-				)
+		for _, sec := range m.sections(i) {
+			k := sectionKey(b.Name, sec.name)
+			add(row{
+				kind:    rowSection,
+				key:     k,
+				branch:  i,
+				section: sec.name,
+				label:   sec.label,
+			})
+			if !m.expanded[k] {
+				continue
 			}
-			if gen > 0 {
-				gk := generatedKey(b.Name)
-				add(row{kind: rowGenerated, key: gk, branch: i, count: gen})
-				if m.expanded[gk] {
-					for fi := range b.Files {
-						f := &b.Files[fi]
-						if !f.Generated {
-							continue
-						}
-						add(row{
-							kind:   rowFile,
-							key:    "file\x00" + b.Name + "\x00" + f.Path,
-							branch: i,
-							file:   f,
-						})
-					}
-				}
-			}
-		}
-		if m.expanded[sectionKey(b.Name, secCommits)] {
-			for ci := range b.Commits {
-				c := &b.Commits[ci]
-				add(
-					row{
+			switch sec.name {
+			case secFiles:
+				m.addFiles(add, i)
+			case secCommits:
+				for ci := range b.Commits {
+					c := &b.Commits[ci]
+					add(row{
 						kind:   rowCommit,
 						key:    "commit\x00" + b.Name + "\x00" + c.SHA,
 						branch: i,
 						commit: c,
-					},
-				)
-			}
-		}
-		if pr := m.prFor(i); pr != nil && m.expanded[sectionKey(b.Name, secChecks)] {
-			for wi := range pr.Checks.Workflows {
-				w := &pr.Checks.Workflows[wi]
-				wk := workflowKey(b.Name, w.Name)
-				add(row{kind: rowWorkflow, key: wk, branch: i, workflow: w})
-				if m.expanded[wk] {
-					for ci := range w.Checks {
-						c := &w.Checks[ci]
-						add(row{
-							kind:     rowCheck,
-							key:      wk + "\x00" + c.Name,
-							branch:   i,
-							workflow: w,
-							check:    c,
-						})
-					}
+					})
 				}
+			case secChecks:
+				m.addChecks(add, i)
 			}
 		}
 		add(row{kind: rowSpacer, branch: i})
 	}
 	add(row{kind: rowTrunk, branch: -1, label: m.snap.Trunk})
+}
+
+func (m *Model) addFiles(add func(row), bi int) {
+	b := &m.snap.Branches[bi]
+	file := func(f *git.FileChange) {
+		add(row{kind: rowFile, key: "file\x00" + b.Name + "\x00" + f.Path, branch: bi, file: f})
+	}
+	gen := 0
+	for fi := range b.Files {
+		if b.Files[fi].Generated {
+			gen++
+			continue
+		}
+		file(&b.Files[fi])
+	}
+	if gen == 0 {
+		return
+	}
+	gk := generatedKey(b.Name)
+	add(row{kind: rowGenerated, key: gk, branch: bi, count: gen})
+	if !m.expanded[gk] {
+		return
+	}
+	for fi := range b.Files {
+		if b.Files[fi].Generated {
+			file(&b.Files[fi])
+		}
+	}
+}
+
+func (m *Model) addChecks(add func(row), bi int) {
+	name := m.snap.Branches[bi].Name
+	wfs := m.prFor(bi).Checks.Workflows
+	for wi := range wfs {
+		w := &wfs[wi]
+		wk := workflowKey(name, w.Name)
+		add(row{kind: rowWorkflow, key: wk, branch: bi, workflow: w})
+		if !m.expanded[wk] {
+			continue
+		}
+		for ci := range w.Checks {
+			add(row{
+				kind:     rowCheck,
+				key:      wk + "\x00" + w.Checks[ci].Name,
+				branch:   bi,
+				workflow: w,
+				check:    &w.Checks[ci],
+			})
+		}
+	}
 }
 
 // navigable reports whether the cursor may rest on row i. Branches are the
@@ -195,7 +203,7 @@ func (m *Model) navigable(i int) bool {
 }
 
 // restoreCursor puts the cursor back on the row it was on before a rebuild,
-// falling back to that row's branch, then to the nearest navigable row.
+// falling back to that row's branch, then to the nearest branch.
 func (m *Model) restoreCursor(fallbackBranch string) {
 	if len(m.rows) == 0 {
 		m.cursor = 0
@@ -211,8 +219,22 @@ func (m *Model) restoreCursor(fallbackBranch string) {
 		m.setCursor(i)
 		return
 	}
-	m.setCursor(min(m.cursor, len(m.rows)-1))
+	// Nearest branch to where the cursor was, so a new stack starts at
+	// branch level.
+	best := -1
+	for i, r := range m.rows {
+		if r.kind == rowBranch && m.navigable(i) &&
+			(best < 0 || abs(i-m.cursor) < abs(best-m.cursor)) {
+			best = i
+		}
+	}
+	if best < 0 {
+		best = min(m.cursor, len(m.rows)-1)
+	}
+	m.setCursor(best)
 }
+
+func abs(n int) int { return max(n, -n) }
 
 // setCursor moves to idx, sliding to the nearest navigable row.
 func (m *Model) setCursor(idx int) {
@@ -366,10 +388,10 @@ func (m *Model) pageBranch(lines int) {
 	}
 }
 
-// firstItem returns the index of the first item row inside branch bi, or -1.
-func (m *Model) firstItem(bi int) int {
+// firstOpenSection returns the index of branch bi's first open section, or -1.
+func (m *Model) firstOpenSection(bi int) int {
 	for i := m.branchRow(bi) + 1; i > 0 && i < len(m.rows) && m.rows[i].branch == bi; i++ {
-		if m.rows[i].item() {
+		if r := m.rows[i]; r.kind == rowSection && m.expanded[r.key] {
 			return i
 		}
 	}

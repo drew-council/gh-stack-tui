@@ -58,7 +58,7 @@ func update(m Model, msg tea.Msg) Model {
 // files, checks with one workflow expanded, and the commits of the branch
 // below.
 func TestRenderShowcase(t *testing.T) {
-	m := press(demoModel(t, 80, 64), "x", "l", "l", "J", "C", "K", "f")
+	m := press(demoModel(t, 80, 64), "x", "l", "j", "l", "J", "C", "K", "f")
 	onBranch(t, m, demo.CurrentBranch)
 	assertScreen(t, m)
 }
@@ -91,8 +91,11 @@ func TestRenderSelection(t *testing.T) {
 }
 
 func TestRenderOtherStack(t *testing.T) {
-	m := press(demoModel(t, 80, 30), "]")
-	assertScreen(t, loadDemo(t, m))
+	m := loadDemo(t, press(demoModel(t, 80, 30), "]"))
+	if r := hovered(t, m); r.kind != rowBranch {
+		t.Fatalf("a new stack should start on a branch, got %+v", r)
+	}
+	assertScreen(t, m)
 }
 
 func TestRenderLoading(t *testing.T) {
@@ -117,6 +120,7 @@ func TestRenderOutputPanel(t *testing.T) {
 		"  auth/token-refresh   up to date",
 		"  auth/middleware      up to date",
 		"  auth/rate-limit      ! [rejected] (non-fast-forward)",
+		"hint: Updates were rejected because the tip of your current branch is behind its remote counterpart.",
 		"error: failed to push some refs",
 		"[exit 1]",
 	}
@@ -127,6 +131,18 @@ func TestRenderOutputPanel(t *testing.T) {
 
 func TestRenderHelp(t *testing.T) {
 	assertScreen(t, press(demoModel(t, 80, 64), "?"))
+}
+
+func TestRenderHelpScrolled(t *testing.T) {
+	assertScreen(t, press(demoModel(t, 80, 30), "?", "ctrl+d", "j", "j"))
+}
+
+func TestRenderConfirm(t *testing.T) {
+	m := press(demoModel(t, 56, 30), "J", "M")
+	if m.mode != modeConfirm {
+		t.Fatalf("M should ask before merging, mode %v", m.mode)
+	}
+	assertScreen(t, m)
 }
 
 func TestRenderReviewerPicker(t *testing.T) {

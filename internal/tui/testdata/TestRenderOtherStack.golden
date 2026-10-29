@@ -1,30 +1,30 @@
-╭─ #8 on main · 2/2 · pinned ────────────────────────────────────── ↻ 12s ago ─╮
-│  ○ billing/webhooks                                          no local branch │
-│  │ #111 Retry failed webhooks with backoff                            closed │
-│  │                                                                           │
-│▌ ○ billing/invoices                                                  +230 -0 │
-│▌ │ #110 Generate monthly invoices                                  in review │
-│▌ │ behind base                                                     ✓ passing │
-│▏ │ ▸ 1 file   ▸ 1 commit   ▸ 3 checks                                        │
-│▏ │                                                                           │
-│  └ main                                                                      │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-╰──────────────────────────────────────────────────────────────────────────────╯
- j/k move  l open  f/C/x files/commits/checks  o browser  c checkout  ? help
+ ╭─ #8 on main · 2/2 · pinned ────────────────────────────────────── ↻ 12s ago ─╮
+ │ ○ billing/webhooks                                           no local branch │
+ │ │ #111 Retry failed webhooks with backoff                             closed │
+ │ │                                                                            │
+█│ ○ billing/invoices                                                      +230 │
+█│ │ #110 Generate monthly invoices                                   in review │
+█│ │ behind base                                                      ✓ passing │
+█│ │ ▸ 1 file                                                                   │
+█│ │ ▸ 1 commit                                                                 │
+█│ │ ▸ 3 checks                                                                 │
+ │ │                                                                            │
+ │ └ main                                                                       │
+ │                                                                              │
+ │                                                                              │
+ │                                                                              │
+ │                                                                              │
+ │                                                                              │
+ │                                                                              │
+ │                                                                              │
+ │                                                                              │
+ │                                                                              │
+ │                                                                              │
+ │                                                                              │
+ │                                                                              │
+ │                                                                              │
+ │                                                                              │
+ │                                                                              │
+ │                                                                              │
+ ╰──────────────────────────────────────────────────────────────────────────────╯
+  j/k move  l open  f/C/x files/commits/checks  o browser  c checkout  ? help

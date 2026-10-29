@@ -26,7 +26,9 @@ Stack operations run `gh stack` against the checked out stack. When you are view
 
 ## Reading the stack
 
-Each branch is a block on the tree, top of the stack first. The left column reads like a sentence: the branch, then its PR number and title, then what needs attention, such as a rebase, conflicts, or unresolved threads. The right column holds state: the diff, where the PR stands with review, and CI. The last line lists the branch's files, commits, and checks; `f`, `C`, and `x` open them under it.
+Each branch is a block on the tree, top of the stack first. The left column reads like a sentence: the branch, then its PR number and title, then what needs attention, such as a rebase, conflicts, or unresolved threads. The right column holds state: the diff, where the PR stands with review, and CI. Under them are the branch's files, commits, and checks, each of which opens on its own.
+
+The hovered branch is shaded whole. When the cursor is on one of its items, that row is shaded brighter. Branches selected for review are tinted mauve, and the stack's border turns mauve in visual mode.
 
 | Mark | Meaning |
 |---|---|
@@ -34,13 +36,12 @@ Each branch is a block on the tree, top of the stack first. The left column read
 | `◆` | selected for review |
 | `◎` `✓` | in the merge queue, merged |
 | `┊` | needs a rebase onto its parent |
-| `▏` `▌` | the hovered branch, the row under the cursor |
 
 `?` shows these marks too.
 
 ## Keys
 
-`j`/`k` move between the branches of the stack, exactly like `gh stack view`. Files, commits, and CI checks open under a branch with `f`, `C`, and `x` (or `l` to open everything). To act on one of them, press `l` again to go into the branch: `j`/`k` then step through its items, and `h` goes back to the branch. Merged branches are shown but skipped.
+`j`/`k` move between the branches of the stack, exactly like `gh stack view`. Files, commits, and CI checks open under a branch with `f`, `C`, and `x` (or `l` to open everything). To act on one of them, press `l` again to go into the branch's first open section: `j`/`k` then step through the sections and their items, and `l` opens or closes the one under the cursor. `h` closes the section or group the cursor is in, and on a closed section goes back to the branch. Merged branches are shown but skipped.
 
 Stack operations follow the aliases of the `gs` wrapper: `p` push, `s` sync, `P` sync --prune, `r` rebase, `c` checkout, `a` add, `m` modify, and `u` unstack. `R` takes the place of `gs review`.
 
@@ -59,8 +60,8 @@ A selection of marked branches, or the visual range, is used by `R`, `D`, `A`, `
 
 | Expand | | Stack | |
 |---|---|---|---|
-| `l` `→` `enter` | open the branch, then go into its items | `p` / `s` / `P` | push / sync / sync --prune |
-| `h` `←` | back to the branch, then close it | `S` | submit --auto |
+| `l` `→` `enter` | open the branch, go into it, open the hovered section | `p` / `s` / `P` | push / sync / sync --prune |
+| `h` `←` | close the hovered section or the one around it, back to the branch | `S` | submit --auto |
 | `f` / `C` / `x` | files / commits / CI checks | `rr` `ru` `rd` | rebase stack / upstack / downstack |
 | `z` / `Z` | toggle branch / collapse all | `rc` `ra` | rebase continue / abort |
 | | | `a` | add a branch (prompts for a name) |

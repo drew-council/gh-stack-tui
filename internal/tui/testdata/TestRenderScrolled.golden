@@ -1,20 +1,20 @@
-╭─ #7 on main · 1/2 ─────────────────────────────────────────────── ↻ 12s ago ─╮
-│  │                                                                           │
-│  ○ auth/audit-log                                                    +106 -2 │
-│  ┊ #106 Write an audit log entry for each login                        draft │
-│  ┊ needs rebase                                                  ● 2 running │
-│  ┊ ▸ 2 files   ▸ 1 commit   ▸ 3 checks                                       │
-│  ┊                                                                           │
-│▏ ● auth/rate-limit                                                  +394 -83 │
-│▏ │ #105 Rate limit login attempts per account              changes requested │
-│▏ │ conflicts · 3 unresolved · 1 bot                  ✗ 2 failing ● 1 running │
-│▏ │ ▾ 5 files   ▸ 4 commits   ▸ 6 checks                                      │
-│▏ │   A internal/ratelimit/limiter.go                                 +156 -0 │
-│▏ │   A internal/ratelimit/limiter_test.go                            +210 -0 │
-│▏ │   M internal/auth/login.go                                         +22 -8 │
-│▌ │   M config/defaults.yaml                                            +6 -1 │
-│▏ │   D internal/auth/lockout.go                                       +0 -74 │
-│▏ │   ▸ 1 generated file                                                      │
-│▏ │                                                                           │
-╰───────────────────────────────────────────────────────────────────── ↑2 ↓16 ─╯
- j/k items  h back  o open  y copy  e edit  ? help
+ ╭─ #7 on main · 1/2 ─────────────────────────────────────────────── ↻ 12s ago ─╮
+ │ ┊ ▸ 2 files                                                                  │
+ │ ┊ ▸ 1 commit                                                                 │
+ │ ┊ ▸ 3 checks                                                                 │
+ │ ┊                                                                            │
+░│ ● auth/rate-limit                                                   +394 -83 │
+░│ │ #105 Rate limit login attempts per account               changes requested │
+░│ │ conflicts · 3 unresolved · 1 bot                   ✗ 2 failing ● 1 running │
+░│ │ ▾ 5 files + 1 generated                                                    │
+░│ │   A internal/ratelimit/limiter.go                                     +156 │
+░│ │   A internal/ratelimit/limiter_test.go                                +210 │
+█│ │   M internal/auth/login.go                                          +22 -8 │
+░│ │   M config/defaults.yaml                                             +6 -1 │
+░│ │   D internal/auth/lockout.go                                           -74 │
+░│ │   ▸ 1 generated file                                                       │
+░│ │ ▸ 4 commits                                                                │
+░│ │ ▸ 6 checks                                                                 │
+ │ │                                                                            │
+ ╰───────────────────────────────────────────────────────────────────── ↑7 ↓20 ─╯
+  j/k items  h back  o open  y copy  e edit  ? help

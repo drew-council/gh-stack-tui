@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"image/color"
 	"strings"
 	"time"
 
@@ -12,16 +13,16 @@ import (
 	"github.com/drew-council/gh-stack-tui/internal/github"
 )
 
-// outputPanelLines is the number of output lines shown under the stack.
+// outputPanelLines is the number of output lines shown under the stack, on a
+// screen tall enough for them.
 const outputPanelLines = 8
 
-// Columns of a stack line, counted from the panel's inner left edge. The
-// gutter holds the cursor bar, the tree runs down colTree, and content starts
-// at colContent. Items nest indentStep columns per level. Values on the right
-// end one column short of the border.
+// Columns of a stack line, counted from the panel's inner left edge. The tree
+// runs down colTree and content starts at colContent. Items nest indentStep
+// columns per level. Values on the right end one column short of the border.
 const (
-	colTree    = 2
-	colContent = 4
+	colTree    = 1
+	colContent = 3
 	indentStep = 2
 )
 
@@ -45,9 +46,13 @@ func (m Model) render() string {
 
 	var title, info, foot string
 	var body []string
+	edge := m.st.rule
 	switch m.mode {
 	case modeHelp:
 		title, body = m.st.title.Render("Keys"), m.helpLines()
+		top := m.helpTop(len(body), h)
+		foot = m.scrollHint(top, len(body), h)
+		body = body[top:]
 	case modeReviewers:
 		title, body = m.st.title.Render("Request reviewers"), m.pickerLines(h)
 	default:
@@ -59,16 +64,19 @@ func (m Model) render() string {
 		} else {
 			body = nil
 		}
-		foot = m.scrollHint(total, h)
+		foot = m.scrollHint(m.scroll, total, h)
+		if m.visual {
+			edge = m.st.bulletSelected
+		}
 	}
 	if len(body) > h {
 		body = body[:h]
 	}
-	lines = append(lines, m.panel(title, info, foot, body, h)...)
+	lines = append(lines, m.panel(edge, title, info, foot, body, h)...)
 	if m.showOutput {
 		lines = append(lines, m.outputLines()...)
 	}
-	lines = append(lines, m.footer())
+	lines = append(lines, m.footer()...)
 
 	for i, l := range lines {
 		lines[i] = ansi.Truncate(l, m.width, "…")
@@ -80,9 +88,9 @@ func (m Model) render() string {
 func (m Model) innerWidth() int { return max(10, m.width-2) }
 
 func (m Model) bodyHeight() int {
-	h := m.height - len(m.headerLines()) - 2 - 1
+	h := m.height - len(m.headerLines()) - 2 - len(m.footer())
 	if m.showOutput {
-		h -= outputPanelLines + 2
+		h -= m.outputHeight() + 2
 	}
 	return max(1, h)
 }
@@ -138,25 +146,24 @@ func (m *Model) ensureVisible() {
 // --- frame ---
 
 // panel frames body, padded to h lines, in a rounded border as wide as the
-// screen. title and info sit on the top border, foot on the bottom one.
-func (m Model) panel(title, info, foot string, body []string, h int) []string {
-	s := m.st
+// screen and drawn in edge. title and info sit on the top border, foot on the
+// bottom one.
+func (m Model) panel(edge lipgloss.Style, title, info, foot string, body []string, h int) []string {
 	w := m.innerWidth()
-	edge := s.rule.Render(glyphConn)
-	lines := []string{m.border(title, info, "╭", "╮")}
+	side := edge.Render(glyphConn)
+	lines := []string{m.border(edge, title, info, "╭", "╮")}
 	for i := range h {
 		l := ""
 		if i < len(body) {
 			l = body[i]
 		}
-		lines = append(lines, edge+pad(l, w)+edge)
+		lines = append(lines, side+pad(l, w)+side)
 	}
-	return append(lines, m.border("", foot, "╰", "╯"))
+	return append(lines, m.border(edge, "", foot, "╰", "╯"))
 }
 
 // border is a horizontal border line with left and right labels set into it.
-func (m Model) border(left, right, lc, rc string) string {
-	s := m.st
+func (m Model) border(edge lipgloss.Style, left, right, lc, rc string) string {
 	if left != "" {
 		left = " " + left + " "
 	}
@@ -172,8 +179,8 @@ func (m Model) border(left, right, lc, rc string) string {
 		left = ansi.Truncate(left, max(0, m.width-5), "…")
 		fill = m.width - 4 - lipgloss.Width(left)
 	}
-	return s.rule.Render(lc+"─") + left + s.rule.Render(strings.Repeat("─", max(0, fill))) +
-		right + s.rule.Render("─"+rc)
+	return edge.Render(lc+"─") + left + edge.Render(strings.Repeat("─", max(0, fill))) +
+		right + edge.Render("─"+rc)
 }
 
 // pad cuts or pads l to exactly w columns.
@@ -201,15 +208,17 @@ func fit(left, right string, w int) string {
 	return left + strings.Repeat(" ", w-1-lipgloss.Width(left)-rw) + right + " "
 }
 
-func (m Model) scrollHint(total, h int) string {
+// scrollHint counts the lines above and below a view of h lines, starting at
+// top, into total.
+func (m Model) scrollHint(top, total, h int) string {
 	if total <= h {
 		return ""
 	}
 	var parts []string
-	if m.scroll > 0 {
-		parts = append(parts, fmt.Sprintf("↑%d", m.scroll))
+	if top > 0 {
+		parts = append(parts, fmt.Sprintf("↑%d", top))
 	}
-	if below := total - m.scroll - h; below > 0 {
+	if below := total - top - h; below > 0 {
 		parts = append(parts, fmt.Sprintf("↓%d", below))
 	}
 	return m.st.dim.Render(strings.Join(parts, " "))
@@ -291,60 +300,70 @@ func (m Model) bodyLines() []string {
 	s := m.st
 	switch {
 	case m.localErr != nil:
-		return []string{"  " + s.err.Render("error: "+m.localErr.Error())}
+		return []string{" " + s.err.Render("error: "+m.localErr.Error())}
 	case m.snap == nil:
-		return []string{"  " + m.spinner.View() + s.dim.Render(" loading stack…")}
+		return []string{" " + m.spinner.View() + s.dim.Render(" loading stack…")}
 	case m.snap.Index < 0:
 		return []string{
-			"  " + s.dim.Render("No stacks in this repository."),
-			"  " + s.dim.Render("Create one with ") + s.normal.Render("gh stack init") +
+			" " + s.dim.Render("No stacks in this repository."),
+			" " + s.dim.Render("Create one with ") + s.normal.Render("gh stack init") +
 				s.dim.Render(", or press : to run a gh stack command."),
 		}
 	}
 	hb := m.hoveredBranch()
 	var lines []string
 	for i, r := range m.rows {
-		cursor := i == m.cursor && m.navigable(i)
-		active := r.branch >= 0 && r.branch == hb
-		for _, l := range m.renderRow(r, active, cursor) {
-			if cursor {
-				l = s.highlight(l)
+		active := r.branch >= 0 && r.branch == hb && r.kind != rowSpacer
+		bg := m.rowBg(i, active)
+		for _, l := range m.renderRow(r, active) {
+			if bg == s.cursorBg {
+				l = s.lift(l)
 			}
-			lines = append(lines, l)
+			lines = append(lines, shade(l, bg))
 		}
 	}
 	return lines
 }
 
+// rowBg is the background of row i. The hovered branch is shaded whole: in
+// the cursor color when the cursor is on the branch, and in the block color
+// around the cursor row when it is on one of the branch's items. Other
+// branches selected for review take the selection tint.
+func (m Model) rowBg(i int, active bool) color.Color {
+	s := m.st
+	r := m.rows[i]
+	if r.branch < 0 || r.kind == rowSpacer {
+		return nil
+	}
+	cursor := i == m.cursor && m.navigable(i) ||
+		active && m.rows[m.cursor].kind == rowBranch
+	switch {
+	case cursor:
+		return s.cursorBg
+	case m.isSelected(r.branch, m.snap.Branches[r.branch].Name):
+		return s.selBg
+	case active:
+		return s.blockBg
+	}
+	return nil
+}
+
 // parts is a line's left-aligned content and its right-aligned value.
 type parts struct{ left, right string }
 
-// gutter marks the active branch with a thin bar down every line, and the
-// row under the cursor with a thick one.
-func (m Model) gutter(active, cursor bool) string {
-	switch {
-	case cursor:
-		return m.st.cursor.Render(glyphCursor) + " "
-	case active:
-		return m.st.cursor.Render(glyphActive) + " "
-	}
-	return "  "
-}
-
-// connector returns the tree line for branch bi and its style: accent for the
-// active branch, peach and dashed when the branch needs a rebase.
+// connector returns the tree line for branch bi and its style: peach and
+// dashed when the branch needs a rebase, else accent for the active branch.
 func (m Model) connector(bi int, active bool) (string, lipgloss.Style) {
 	s := m.st
 	b := m.snap.Branches[bi]
 	pr := m.prFor(bi)
-	glyph, style := glyphConn, s.conn
 	if b.NeedsRebase && !m.merged(bi) && (pr == nil || !pr.Queued) {
-		glyph, style = glyphDashed, s.connDashed
+		return glyphDashed, s.connDashed
 	}
 	if active {
-		style = s.connActive
+		return glyphConn, s.connActive
 	}
-	return glyph, style
+	return glyphConn, s.conn
 }
 
 // bullet marks branch bi on the tree: selected, checked out, merged, queued,
@@ -354,7 +373,9 @@ func (m Model) bullet(bi int, active bool) string {
 	b := m.snap.Branches[bi]
 	pr := m.prFor(bi)
 	switch {
-	case m.marks[b.Name] || (m.visual && m.isSelected(bi, b.Name)):
+	case m.isSelected(bi, b.Name) && b.IsCurrent:
+		return s.bulletCurrent.Render(glyphSelected)
+	case m.isSelected(bi, b.Name):
 		return s.bulletSelected.Render(glyphSelected)
 	case b.IsCurrent:
 		return s.bulletCurrent.Render(glyphCurrent)
@@ -369,37 +390,43 @@ func (m Model) bullet(bi int, active bool) string {
 }
 
 // renderRow renders one row as lines exactly the panel's inner width. active
-// is true for every row of the branch the cursor is on or inside, cursor for
-// the row under the cursor.
-func (m Model) renderRow(r row, active, cursor bool) []string {
+// is true for the rows of the branch the cursor is on or inside.
+func (m Model) renderRow(r row, active bool) []string {
 	s := m.st
 	w := m.innerWidth()
+	lead := strings.Repeat(" ", colTree)
 	switch r.kind {
 	case rowSeparator:
-		lead := "  " + s.rule.Render("── ") + s.dim.Render(r.label) + " "
+		head := lead + s.rule.Render("── ") + s.dim.Render(r.label) + " "
 		return []string{
-			pad(lead+s.rule.Render(strings.Repeat("─", max(0, w-1-lipgloss.Width(lead)))), w),
+			pad(head+s.rule.Render(strings.Repeat("─", max(0, w-1-lipgloss.Width(head)))), w),
 		}
 	case rowTrunk:
-		return []string{pad("  "+s.conn.Render(glyphTrunk)+" "+s.trunk.Render(r.label), w)}
+		return []string{pad(lead+s.conn.Render(glyphTrunk)+" "+s.trunk.Render(r.label), w)}
 	case rowBranch:
-		return m.renderBranch(r, active, cursor)
+		return m.renderBranch(r, active)
 	}
 
 	conn, cs := m.connector(r.branch, active)
-	lead := m.gutter(active, cursor) + cs.Render(conn) + " "
+	lead += cs.Render(conn)
 	if r.kind == rowSpacer {
-		return []string{pad(m.gutter(active, cursor)+cs.Render(conn), w)}
+		return []string{pad(lead, w)}
 	}
-	indent := func(level int) string { return lead + strings.Repeat(" ", level*indentStep) }
+	indent := func(level int) string { return lead + " " + strings.Repeat(" ", level*indentStep) }
+	toggle := func(key string) string {
+		if m.expanded[key] {
+			return glyphExpanded
+		}
+		return glyphCollapsed
+	}
 
 	switch r.kind {
-	case rowSections:
-		var segs []string
-		for _, seg := range m.sectionSegments(r.branch) {
-			segs = append(segs, seg.text)
+	case rowSection:
+		style := s.faintS
+		if m.expanded[r.key] {
+			style = s.normal
 		}
-		return []string{pad(lead+strings.Join(segs, "   "), w)}
+		return []string{fit(indent(0)+style.Render(toggle(r.key)+" "+r.label), "", w)}
 
 	case rowFile:
 		f := r.file
@@ -416,12 +443,8 @@ func (m Model) renderRow(r row, active, cursor bool) []string {
 			s.normal.Render(truncateLeft(f.Path, room)), stat, w)}
 
 	case rowGenerated:
-		glyph := glyphCollapsed
-		if m.expanded[r.key] {
-			glyph = glyphExpanded
-		}
 		text := plural(r.count, "generated file", "generated files")
-		return []string{fit(indent(1)+s.dim.Render(glyph+" "+text), "", w)}
+		return []string{fit(indent(1)+s.dim.Render(toggle(r.key)+" "+text), "", w)}
 
 	case rowCommit:
 		c := r.commit
@@ -432,25 +455,11 @@ func (m Model) renderRow(r row, active, cursor bool) []string {
 
 	case rowWorkflow:
 		wf := r.workflow
-		glyph := glyphCollapsed
-		if m.expanded[r.key] {
-			glyph = glyphExpanded
-		}
-		return []string{
-			fit(
-				indent(
-					1,
-				)+s.faintS.Render(
-					glyph,
-				)+" "+s.checkGlyph(
-					wf.State,
-				)+" "+s.normal.Render(
-					wf.Name,
-				),
-				m.checkCounts(wf.Checks),
-				w,
-			),
-		}
+		return []string{fit(
+			indent(1)+s.faintS.Render(toggle(r.key))+" "+s.checkGlyph(wf.State)+" "+
+				s.normal.Render(wf.Name),
+			m.checkCounts(wf.Checks), w,
+		)}
 
 	case rowCheck:
 		c := r.check
@@ -476,16 +485,17 @@ func (m Model) fileStatus(status string) string {
 	return s.dim.Render(status[:1])
 }
 
-func (m Model) renderBranch(r row, active, cursor bool) []string {
+func (m Model) renderBranch(r row, active bool) []string {
 	w := m.innerWidth()
 	conn, cs := m.connector(r.branch, active)
+	lead := strings.Repeat(" ", colTree)
 	var lines []string
 	for i, p := range m.branchParts(r.branch) {
 		mark := cs.Render(conn)
 		if i == 0 {
 			mark = m.bullet(r.branch, active)
 		}
-		lines = append(lines, fit(m.gutter(active, cursor)+mark+" "+p.left, p.right, w))
+		lines = append(lines, fit(lead+mark+" "+p.left, p.right, w))
 	}
 	return lines
 }
@@ -534,7 +544,19 @@ func (m Model) branchParts(bi int) []parts {
 	if notes, ci := m.attention(bi), m.ciState(bi); notes != "" || ci != "" {
 		out = append(out, parts{notes, ci})
 	}
-	return out
+	// A value that does not fit beside its line takes its own line, so
+	// neither is cut.
+	room := m.innerWidth() - colContent - 1
+	var fitted []parts
+	for i, p := range out {
+		if i > 0 && p.left != "" && p.right != "" &&
+			lipgloss.Width(p.left)+2+lipgloss.Width(p.right) > room {
+			fitted = append(fitted, parts{p.left, ""}, parts{"", p.right})
+			continue
+		}
+		fitted = append(fitted, p)
+	}
+	return fitted
 }
 
 // prState is where branch bi's PR stands: queued, closed, draft, or for an
@@ -623,24 +645,16 @@ func (m Model) ciState(bi int) string {
 	return s.ok.Render("✓ passing")
 }
 
-// segment is one section on a branch's sections line.
-type segment struct {
-	section string
-	text    string
-}
+// section is one of a branch's files, commits, or checks, with its label.
+type section struct{ name, label string }
 
-// sectionSegments are the sections branch bi has, open ones in primary ink.
-func (m Model) sectionSegments(bi int) []segment {
-	s := m.st
+// sections are the sections branch bi has, in the order they show.
+func (m Model) sections(bi int) []section {
 	b := m.snap.Branches[bi]
-	var segs []segment
-	add := func(section, text string) {
-		glyph, style := glyphCollapsed, s.faintS
-		if m.expanded[sectionKey(b.Name, section)] {
-			glyph, style = glyphExpanded, s.normal
-		}
-		segs = append(segs, segment{section, style.Render(glyph + " " + text)})
+	if m.merged(bi) {
+		return nil
 	}
+	var out []section
 	if len(b.Files) > 0 {
 		n := 0
 		for _, f := range b.Files {
@@ -648,37 +662,26 @@ func (m Model) sectionSegments(bi int) []segment {
 				n++
 			}
 		}
-		if n == 0 {
-			add(secFiles, plural(len(b.Files), "generated file", "generated files"))
-		} else {
-			add(secFiles, plural(n, "file", "files"))
+		label := plural(n, "file", "files")
+		switch gen := len(b.Files) - n; {
+		case n == 0:
+			label = plural(gen, "generated file", "generated files")
+		case gen > 0:
+			label += fmt.Sprintf(" + %d generated", gen)
 		}
+		out = append(out, section{secFiles, label})
 	}
 	if len(b.Commits) > 0 {
-		add(secCommits, plural(len(b.Commits), "commit", "commits"))
+		out = append(out, section{secCommits, plural(len(b.Commits), "commit", "commits")})
 	}
 	if pr := m.prFor(bi); pr != nil && len(pr.Checks.Workflows) > 0 {
 		n := 0
 		for _, w := range pr.Checks.Workflows {
 			n += len(w.Checks)
 		}
-		add(secChecks, plural(n, "check", "checks"))
+		out = append(out, section{secChecks, plural(n, "check", "checks")})
 	}
-	return segs
-}
-
-// sectionAt returns the section whose label covers column col of branch bi's
-// sections line, or "".
-func (m Model) sectionAt(bi, col int) string {
-	x := colContent
-	for _, seg := range m.sectionSegments(bi) {
-		w := lipgloss.Width(seg.text)
-		if col >= x && col < x+w {
-			return seg.section
-		}
-		x += w + 3
-	}
-	return ""
+	return out
 }
 
 func (m Model) checkCounts(checks []github.Check) string {
@@ -706,8 +709,16 @@ func (m Model) checkCounts(checks []github.Check) string {
 	return strings.Join(parts, s.dim.Render(" · "))
 }
 
+// diffStat is the lines added and deleted, leaving out a count of zero.
 func (m Model) diffStat(add, del int) string {
-	return m.st.add.Render(fmt.Sprintf("+%d", add)) + " " + m.st.del.Render(fmt.Sprintf("-%d", del))
+	var out []string
+	if add > 0 {
+		out = append(out, m.st.add.Render(fmt.Sprintf("+%d", add)))
+	}
+	if del > 0 {
+		out = append(out, m.st.del.Render(fmt.Sprintf("-%d", del)))
+	}
+	return strings.Join(out, " ")
 }
 
 func plural(n int, one, many string) string {
@@ -774,21 +785,79 @@ func (m Model) outputLines() []string {
 	title := s.title.Render(m.outputTitle) + " " + status
 	hide := s.key.Render("!") + s.keyDesc.Render(" hide")
 
-	out := m.output
-	if len(out) > outputPanelLines {
-		out = out[len(out)-outputPanelLines:]
-	}
 	var body []string
-	for _, l := range out {
+	for _, l := range m.outputText() {
 		body = append(body, " "+s.dim.Render(l))
 	}
-	return m.panel(title, hide, "", body, outputPanelLines)
+	return m.panel(s.rule, title, hide, "", body, m.outputHeight())
+}
+
+// outputHeight is the output panel's height inside its border. It stays the
+// same while output streams in, and shrinks on short screens so the stack
+// keeps most of the room.
+func (m Model) outputHeight() int {
+	return max(2, min(outputPanelLines, m.height/4))
+}
+
+// outputText is the end of the output, wrapped to fit the panel.
+func (m Model) outputText() []string {
+	// Long lines wrap, since errors are what the panel is for.
+	var out []string
+	for _, l := range m.output {
+		first, rest, _ := strings.Cut(ansi.Wrap(l, m.innerWidth()-2, " /"), "\n")
+		out = append(out, first)
+		// Continuations hang under the line's text.
+		if rest != "" {
+			rest = ansi.Wrap(strings.ReplaceAll(rest, "\n", " "), m.innerWidth()-4, " /")
+			for _, r := range strings.Split(rest, "\n") {
+				out = append(out, "  "+r)
+			}
+		}
+	}
+	if h := m.outputHeight(); len(out) > h {
+		out = out[len(out)-h:]
+	}
+	return out
 }
 
 // --- footer ---
 
-func (m Model) footer() string {
-	return " " + m.footerText()
+// footer is the line under the panels: key hints, a prompt, or a flash. A
+// question, such as a confirm, takes two lines or more: the question, then
+// every answer.
+func (m Model) footer() []string {
+	question, keys := "", []string(nil)
+	switch {
+	case m.mode == modeConfirm:
+		question, keys = m.confirm.text, m.confirm.keys
+	case m.mode == modeNormal && m.pendingKey == "r":
+		question = "rebase:"
+		keys = []string{
+			"r", "whole stack", "u", "upstack", "d", "downstack", "c", "continue", "a", "abort",
+		}
+	}
+	if question != "" {
+		s := m.st
+		w := m.width - 2
+		var lines []string
+		for _, l := range strings.Split(ansi.Wrap(question, w, " "), "\n") {
+			lines = append(lines, " "+s.warn.Render(l))
+		}
+		var line string
+		for i := 0; i+1 < len(keys); i += 2 {
+			h := s.key.Render(keys[i]) + s.keyDesc.Render(" "+keys[i+1])
+			if line != "" && lipgloss.Width(line)+2+lipgloss.Width(h) > w {
+				lines = append(lines, " "+line)
+				line = ""
+			}
+			if line != "" {
+				line += "  "
+			}
+			line += h
+		}
+		return append(lines, " "+line)
+	}
+	return []string{" " + m.footerText()}
 }
 
 func (m Model) footerText() string {
@@ -800,33 +869,26 @@ func (m Model) footerText() string {
 			p = "gh stack "
 		}
 		return s.prompt.Render(p) + m.input.View()
-	case modeConfirm:
-		return s.warn.Render(m.confirm.text)
 	case modeHelp:
-		return s.dim.Render("press any key to close help")
+		return m.hints("j/k", "scroll", "ctrl+d/u", "half page", "g/G", "top/end", "esc", "close")
 	case modeReviewers:
 		if m.picker != nil && !m.picker.ready {
-			return m.hints(
-				"↑/↓", "move", "tab", "pick", "enter", "request review",
-				"ctrl+s", "skip", "esc", "skip",
-			)
+			return m.hints("↑/↓", "move", "tab", "pick", "enter", "request", "esc", "skip")
 		}
 		return m.hints(
-			"↑/↓", "move", "tab", "pick", "enter", "request review + mark ready",
-			"ctrl+s", "mark ready without", "esc", "skip",
+			"tab", "pick", "enter", "request + ready", "ctrl+s", "ready only", "esc", "keep draft",
 		)
 	}
 	switch m.pendingKey {
-	case "r":
-		return s.prompt.Render("rebase ") + m.hints(
-			"r", "whole stack", "u", "upstack", "d", "downstack", "c", "continue", "a", "abort",
-		)
 	case "g":
 		return s.prompt.Render("g") + s.dim.Render("…")
 	}
 	if m.flash != "" {
-		if m.flashErr {
+		switch {
+		case m.flashErr:
 			return s.flashErr.Render(m.flash)
+		case m.flashNote:
+			return s.note.Render(m.flash)
 		}
 		return s.flashOK.Render(m.flash)
 	}
@@ -890,6 +952,12 @@ func (m Model) hintsIn(width int, pairs ...string) string {
 
 // --- help ---
 
+// helpTop is the first help line shown, kept so the last line can reach the
+// bottom of the panel.
+func (m Model) helpTop(total, h int) int {
+	return max(0, min(m.helpScroll, total-h))
+}
+
 func (m Model) helpLines() []string {
 	s := m.st
 	var cols []string
@@ -925,7 +993,7 @@ func (m Model) helpLines() []string {
 	}
 	out := []string{""}
 	for _, l := range strings.Split(strings.Join(rows, "\n"), "\n") {
-		out = append(out, "  "+l)
+		out = append(out, " "+l)
 	}
 	return out
 }

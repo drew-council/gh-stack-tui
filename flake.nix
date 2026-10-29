@@ -41,7 +41,11 @@
             golines
             gofumpt
             sqlc
+            # scripts/shot.nu
+            tmux
+            charm-freeze
           ];
+          GHST_SHOT_FONT = "${pkgs.nerd-fonts.jetbrains-mono}/share/fonts/truetype/NerdFonts/JetBrainsMono/JetBrainsMonoNerdFontMono-Regular.ttf";
         };
 
         packages = rec {

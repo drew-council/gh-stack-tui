@@ -26,9 +26,24 @@ When a UI change is intended, rewrite the golden files:
 go test ./internal/tui -update
 ```
 
-To look at the UI by hand, run `go run . demo`.
-
 Then read the `git diff` of `testdata` and confirm every change is intended. Never run `-update` just to make a failing test pass. Pass `-update` to `internal/tui` only; packages without golden files reject the flag.
+
+Goldens have no color, so each line starts with a mark for its background: `█` the cursor, `░` the rest of the hovered branch, `▒` a branch selected for review.
+
+### Looking at the UI
+
+Goldens MUST NOT be the only check of a visual change; look at it in color too. `scripts/shot.nu` runs `ghst demo` in a private tmux server and renders the screen to PNG with freeze. It needs the dev shell, which provides tmux, freeze, and the JetBrains Mono Nerd Font in `$GHST_SHOT_FONT`.
+
+```sh
+nix develop -c nu scripts/shot.nu start 80 50
+nix develop -c nu scripts/shot.nu keys j l Space
+nix develop -c nu scripts/shot.nu shot cursor
+nix develop -c nu scripts/shot.nu stop
+```
+
+`shot` writes `tmp/shots/<name>.png`, which can be read as an image, and prints its path. `text` prints the screen as plain text and `resize` changes its size. Keys are tmux key names. freeze has no font fallback, so a glyph the font lacks, such as `↻`, shows as a box in shots but not in a terminal.
+
+People can run `go run . demo` themselves.
 
 ## Generated and pinned files
 

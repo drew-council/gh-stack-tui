@@ -447,11 +447,16 @@ func TestReviewerPickerWaitsForReviewers(t *testing.T) {
 		"#2 Second layer",
 		"only teams are requested: go-readability",
 		"2/5",
-		"▌ · bob",
+		"· bob",
 		"38 recent PRs",
 	} {
 		if !strings.Contains(screen, want) {
 			t.Errorf("screen is missing %q:\n%s", want, screen)
+		}
+	}
+	for _, l := range strings.Split(m.render(), "\n") {
+		if strings.Contains(ansi.Strip(l), "· bob") && !strings.Contains(l, bgSeq(m.st.cursorBg)) {
+			t.Errorf("the cursor should be on bob: %q", l)
 		}
 	}
 }

@@ -3,3 +3,6 @@
 
 # build output
 /gh-stack-tui
+
+# scripts/shot.nu
+/tmp/

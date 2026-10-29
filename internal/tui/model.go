@@ -93,10 +93,12 @@ type Model struct {
 	cursor    int
 	cursorKey string
 	scroll    int
-	expanded  map[string]bool
-	marks     map[string]bool
-	visual    bool
-	anchor    string // branch name the visual selection started on
+	// helpScroll is how far the help screen is scrolled.
+	helpScroll int
+	expanded   map[string]bool
+	marks      map[string]bool
+	visual     bool
+	anchor     string // branch name the visual selection started on
 
 	width, height int
 	mode          mode
@@ -115,9 +117,10 @@ type Model struct {
 	outputState opStatus
 	showOutput  bool
 
-	flash    string
-	flashErr bool
-	flashSeq int
+	flash     string
+	flashErr  bool
+	flashNote bool // flash is neither success nor an error
+	flashSeq  int
 
 	spinner spinner.Model
 
@@ -130,10 +133,14 @@ func New(local Local, opts Options) Model {
 	if opts.Connect == nil {
 		opts.Connect = connectGitHub
 	}
+	st := newStyles()
 	in := textinput.New()
 	in.Prompt = ""
 	in.CharLimit = 256
-	st := newStyles()
+	is := in.Styles()
+	is.Focused.Placeholder = st.dim
+	is.Blurred.Placeholder = st.dim
+	in.SetStyles(is)
 	return Model{
 		opts:  opts,
 		local: local,
@@ -172,6 +179,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		m.input.SetWidth(max(10, msg.Width-20))
+		// Branch heights depend on the width.
+		m.rebuild()
 		m.ensureVisible()
 		return m, nil
 
@@ -301,9 +310,17 @@ type flashMsg struct {
 
 type clearFlashMsg struct{ seq int }
 
+// setNote flashes text that reports neither success nor an error, such as a
+// cancelled prompt.
+func (m *Model) setNote(text string) tea.Cmd {
+	cmd := m.setFlash(text, false)
+	m.flashNote = true
+	return cmd
+}
+
 func (m *Model) setFlash(text string, isErr bool) tea.Cmd {
 	m.flash = text
-	m.flashErr = isErr
+	m.flashErr, m.flashNote = isErr, false
 	m.flashSeq++
 	seq := m.flashSeq
 	d := 4 * time.Second
@@ -365,19 +382,15 @@ func (m *Model) click(x, y int) tea.Cmd {
 		if line < r.y || line >= r.y+r.height {
 			continue
 		}
-		switch {
-		case r.kind == rowSections:
-			if m.navigable(m.branchRow(r.branch)) {
-				m.setCursor(m.branchRow(r.branch))
-			}
-			if sec := m.sectionAt(r.branch, col); sec != "" {
-				m.toggleSection(sec)
-			}
-		case r.kind == rowWorkflow || r.kind == rowGenerated:
+		switch r.kind {
+		case rowSection, rowWorkflow, rowGenerated:
 			m.setCursor(i)
 			m.expanded[r.key] = !m.expanded[r.key]
 			m.rebuild()
-		case m.navigable(i):
+		default:
+			if !m.navigable(i) {
+				return nil
+			}
 			m.setCursor(i)
 			// The PR number starts the branch's second line.
 			num := m.prNumber(r.branch)
