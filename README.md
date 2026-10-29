@@ -8,7 +8,7 @@ It covers what `gh stack view` shows, and adds:
 - **CI checks per PR**, grouped by workflow. Each workflow expands to its jobs, and re-runs are deduplicated.
 - **Stack operations without leaving the TUI:** push, sync, rebase, submit, merge, add, and unstack. Output streams into a panel under the stack. Commands started while one is running queue up and run in order; a failure or `ctrl+c` drops the rest. `gh stack modify` runs in the foreground and the TUI comes back when it exits.
 - **Vim-style keys throughout.** Arrow keys also work.
-- **Catppuccin Mocha** colors, laid out like `gh stack view`.
+- **Catppuccin Mocha** colors, with the stack drawn as a tree like `gh stack view`.
 - **Copying** the hovered file path, commit SHA, branch name, or URL.
 - **Review:** select layers of the stack and open their combined commit range in [tuicr](https://github.com/agavra/tuicr), or a single layer's PR, in a new herdr tab, a new tmux window, or inline.
 
@@ -24,9 +24,24 @@ The TUI shows the stack containing the checked out branch and follows you when y
 
 Stack operations run `gh stack` against the checked out stack. When you are viewing a different stack, press `c` on one of its branches first.
 
+## Reading the stack
+
+Each branch is a block on the tree, top of the stack first. The left column reads like a sentence: the branch, then its PR number and title, then what needs attention, such as a rebase, conflicts, or unresolved threads. The right column holds state: the diff, where the PR stands with review, and CI. Under them are the branch's files, commits, and checks, each of which opens on its own.
+
+The hovered branch is shaded whole, down to the gap under it. When the cursor is on one of its items, that row is shaded brighter. Mauve means selected for review and nothing else: selected branches are tinted mauve, the one under the cursor brighter, and the stack's border turns mauve in visual mode. Blue marks the checked out branch, and peach anything that needs attention.
+
+| Mark | Meaning |
+|---|---|
+| `●` `○` | checked out branch, other branch |
+| `◆` `◇` | selected for review: the checked out branch, another branch |
+| `◎` `✓` | in the merge queue, merged |
+| `┊` | needs a rebase onto its parent |
+
+`?` shows these marks too.
+
 ## Keys
 
-`j`/`k` move between the branches of the stack, exactly like `gh stack view`. Files, commits, and CI checks open under a branch with `f`, `C`, and `x` (or `l` to open everything). To act on one of them, press `l` again to go into the branch: `j`/`k` then step through its items, and `h` goes back to the branch. Merged branches are shown but skipped.
+`j`/`k` move between the branches of the stack, exactly like `gh stack view`. `l` goes one level in and `h` one level out. On a branch, `l` moves onto its files, commits, and checks, and `j`/`k` step between them. `l` on one of them opens it and moves onto its first entry; a workflow opens onto its jobs the same way. `h` closes what the cursor is in and moves onto it, and from a section goes back to the branch. `f`, `C`, and `x` open or close a branch's files, commits, and checks from anywhere in it. Merged branches are shown, one line each, but skipped.
 
 Stack operations follow the aliases of the `gs` wrapper: `p` push, `s` sync, `P` sync --prune, `r` rebase, `c` checkout, `a` add, `m` modify, and `u` unstack. `R` takes the place of `gs review`.
 
@@ -45,8 +60,8 @@ A selection of marked branches, or the visual range, is used by `R`, `D`, `A`, `
 
 | Expand | | Stack | |
 |---|---|---|---|
-| `l` `→` `enter` | open the branch, then go into its items | `p` / `s` / `P` | push / sync / sync --prune |
-| `h` `←` | back to the branch, then close it | `S` | submit --auto |
+| `l` `→` `enter` | one level in: onto the sections, then open one and onto its first entry | `p` / `s` / `P` | push / sync / sync --prune |
+| `h` `←` | one level out: close it and move onto it, then back to the branch | `S` | submit --auto |
 | `f` / `C` / `x` | files / commits / CI checks | `rr` `ru` `rd` | rebase stack / upstack / downstack |
 | `z` / `Z` | toggle branch / collapse all | `rc` `ra` | rebase continue / abort |
 | | | `a` | add a branch (prompts for a name) |

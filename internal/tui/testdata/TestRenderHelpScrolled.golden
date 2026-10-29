@@ -1,0 +1,30 @@
+ ╭─ Keys ───────────────────────────────────────────────────────────────────────╮
+ │ z / Z      toggle branch / collapse all                                      │
+ │                                                                              │
+ │ branch or item                                                               │
+ │ o          open PR(s) / item in browser                                      │
+ │ y          copy name(s) / path / sha / url                                   │
+ │ Y          copy changed file paths                                           │
+ │ e          edit file in $EDITOR                                              │
+ │ c          checkout branch                                                   │
+ │ M          merge PR (and below)                                              │
+ │ D          toggle PR(s) draft / ready (selection or hovered)                 │
+ │ A          ask reviewers (selection or hovered, draft or ready)              │
+ │                                                                              │
+ │ stack                                                                        │
+ │ p          push                                                              │
+ │ s          sync                                                              │
+ │ P          sync --prune                                                      │
+ │ S          submit --auto                                                     │
+ │ rr ru rd   rebase all/upstack/downstack                                      │
+ │ rc ra      rebase continue/abort                                             │
+ │ a          add branch                                                        │
+ │ m          modify (interactive)                                              │
+ │ u          unstack                                                           │
+ │ :          run gh stack …                                                    │
+ │                                                                              │
+ │ review                                                                       │
+ │ space      mark branch                                                       │
+ │ v          visual range                                                      │
+ ╰──────────────────────────────────────────────────────────────────── ↑15 ↓19 ─╯
+  j/k scroll  ctrl+d/u half page  g/G top/end  esc close

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"errors"
+	"image/color"
 	"slices"
 	"strings"
 	"testing"
@@ -94,6 +95,8 @@ func press(m Model, keys ...string) Model {
 			msg = tea.KeyPressMsg{Code: tea.KeyTab}
 		case "space":
 			msg = tea.KeyPressMsg{Code: tea.KeySpace, Text: " "}
+		case "ctrl+d":
+			msg = tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl}
 		default:
 			r := []rune(k)[0]
 			msg = tea.KeyPressMsg{Code: r, Text: k}
@@ -123,11 +126,31 @@ func onBranch(t *testing.T, m Model, name string) {
 
 // assertScreen compares m's screen, without color or trailing spaces, to
 // testdata/<test name>.golden. Run go test with -update to rewrite it.
+//
+// Each line starts with a mark for its background, which color would show:
+// █ the cursor, ░ the rest of the hovered branch, ▓ the cursor on a branch
+// selected for review, ▒ a selected branch, and a space for none.
 func assertScreen(t *testing.T, m Model) {
 	t.Helper()
+	marks := []struct {
+		bg   color.Color
+		mark string
+	}{
+		{m.st.selCursorBg, "▓"},
+		{m.st.selBg, "▒"},
+		{m.st.cursorBg, "█"},
+		{m.st.blockBg, "░"},
+	}
 	var lines []string
 	for _, l := range strings.Split(m.render(), "\n") {
-		lines = append(lines, strings.TrimRight(ansi.Strip(l), " "))
+		mark := " "
+		for _, mk := range marks {
+			if strings.Contains(l, bgSeq(mk.bg)) {
+				mark = mk.mark
+				break
+			}
+		}
+		lines = append(lines, strings.TrimRight(mark+ansi.Strip(l), " "))
 	}
 	goldie.New(t).Assert(t, t.Name(), []byte(strings.Join(lines, "\n")+"\n"))
 }
@@ -142,7 +165,7 @@ func TestRowsTopFirstWithMergedSeparator(t *testing.T) {
 		rowBranch, rowSpacer, // four
 		rowBranch, rowSection, rowSpacer, // three: files
 		rowBranch, rowSection, rowSection, rowSection, rowSpacer, // two: files, commits, checks
-		rowSeparator, rowBranch, rowSpacer, // one (merged)
+		rowSeparator, rowBranch, // one (merged), on one line
 		rowTrunk,
 	}
 	if len(kinds) != len(want) {
@@ -179,30 +202,48 @@ func TestJKMoveBetweenBranchesOnly(t *testing.T) {
 }
 
 func TestDescendIntoItemsAndBack(t *testing.T) {
-	m := press(testModel(), "f", "l")
-	if r := hovered(t, m); r.kind != rowFile || r.file.Path != "a.go" {
-		t.Fatalf("l should go into the open files, got %+v", r)
+	section := func(m Model, name string, open bool) {
+		t.Helper()
+		if r := hovered(
+			t,
+			m,
+		); r.kind != rowSection || r.section != name ||
+			m.expanded[r.key] != open {
+			t.Fatalf("expected the %s section, open %v, got %+v", name, open, r)
+		}
 	}
-	m = press(m, "j")
-	if r := hovered(t, m); r.kind != rowFile || r.file.Path != "b.go" {
-		t.Fatalf("j should step to b.go, got %+v", r)
+	// l goes one level in: onto the sections, then into one, opening it.
+	m := press(testModel(), "l")
+	section(m, secFiles, false)
+	m = press(m, "l")
+	if r := hovered(
+		t,
+		m,
+	); r.kind != rowFile || r.file.Path != "a.go" ||
+		!m.expanded[sectionKey("two", secFiles)] {
+		t.Fatalf("l on the files should open them and go onto a.go, got %+v", r)
 	}
-	// j on the last item stays; k twice climbs back onto the branch.
-	m = press(m, "j")
-	if r := hovered(t, m); r.file == nil || r.file.Path != "b.go" {
-		t.Fatalf("j on the last item should stay, got %+v", r)
-	}
-	m = press(m, "k", "k")
+	// j steps through the files and on to the next section, and stays on
+	// the last item.
+	m = press(m, "j", "j")
+	section(m, secCommits, false)
+	m = press(m, "j", "j")
+	section(m, secChecks, false)
+	// h goes one level out: from a file it closes the files and goes onto
+	// them, then back to the branch.
+	m = press(m, "k", "k", "h")
+	section(m, secFiles, false)
+	m = press(m, "h")
 	onBranch(t, m, "two")
 	// h on a branch closes all of its sections.
-	m = press(m, "h")
+	m = press(m, "f", "C", "h")
 	if m.branchExpanded("two") {
 		t.Fatal("h on a branch should close its sections")
 	}
-	// Checks: l on the workflow opens it, j reaches the check, h closes it.
-	m = press(m, "x", "l")
+	// Checks nest one level deeper, and h backs out the same way.
+	m = press(m, "l", "j", "j", "l")
 	if r := hovered(t, m); r.kind != rowWorkflow {
-		t.Fatalf("expected the workflow, got %+v", r)
+		t.Fatalf("l on the checks should go onto the workflow, got %+v", r)
 	}
 	m = press(m, "l", "j")
 	if r := hovered(t, m); r.kind != rowCheck || r.check.Name != "test" {
@@ -212,11 +253,15 @@ func TestDescendIntoItemsAndBack(t *testing.T) {
 	if r := hovered(t, m); r.kind != rowWorkflow || m.expanded[r.key] {
 		t.Fatalf("h on a check should close the workflow and park on it, got %+v", r)
 	}
-	// Closing the section from inside puts the cursor back on the branch.
-	m = press(m, "x")
+	m = press(m, "h")
+	section(m, secChecks, false)
+	m = press(m, "h")
 	onBranch(t, m, "two")
+	// Closing the section from inside puts the cursor on the section.
+	m = press(m, "l", "j", "j", "l", "x")
+	section(m, secChecks, false)
 	// J and K leave the items for the neighbouring branches.
-	m = press(m, "f", "l", "K")
+	m = press(m, "K")
 	onBranch(t, m, "three")
 }
 
@@ -301,21 +346,21 @@ func TestReviewSingleBranchWithPR(t *testing.T) {
 
 func TestHeaderNotesGetTheirOwnLine(t *testing.T) {
 	m := testModel()
-	if n := len(m.headerLines()); n != 2 {
-		t.Fatalf("plain header should be the title and a blank line, got %d lines", n)
+	if n := len(m.headerLines()); n != 0 {
+		t.Fatalf("plain header should be empty, got %d lines", n)
 	}
 	m.snap.Rebasing, m.snap.Dirty = true, true
 	lines := m.headerLines()
-	if len(lines) != 3 {
-		t.Fatalf("header with notes should add one line, got %d", len(lines))
+	if len(lines) != 1 {
+		t.Fatalf("header with notes should be one line, got %d", len(lines))
 	}
-	if got := ansi.Strip(
-		lines[1],
-	); got != "rebase in progress  rc continue · ra abort · uncommitted changes" {
+	if got := strings.TrimSpace(ansi.Strip(
+		lines[0],
+	)); got != "rebase in progress  rc continue · ra abort · uncommitted changes" {
 		t.Fatalf("notes line = %q", got)
 	}
-	if strings.Contains(ansi.Strip(lines[0]), "rebase") {
-		t.Fatal("title line should not carry the rebase note")
+	if title, _ := m.stackTitle(); strings.Contains(ansi.Strip(title), "rebase") {
+		t.Fatal("panel title should not carry the rebase note")
 	}
 }
 
@@ -453,13 +498,13 @@ func TestGeneratedFilesGroupedAndCollapsible(t *testing.T) {
 
 	// Opening files shows only non-generated files in the count and at the
 	// top level, with generated files collapsed into a subgroup below them.
-	m = press(m, "f", "l", "j", "j")
+	m = press(m, "f", "l", "j", "j", "j")
 	if r := hovered(t, m); r.kind != rowGenerated || r.count != 2 {
 		t.Fatalf("expected collapsed generated group of 2, got %+v", r)
 	}
 
-	// Expanding the generated subgroup reveals the generated files at indent 6.
-	m = press(m, "l", "j")
+	// l opens the generated subgroup and goes onto its first file.
+	m = press(m, "l")
 	if r := hovered(t, m); r.kind != rowFile || r.file.Path != "a.pb.go" {
 		t.Fatalf("expected first generated file, got %+v", r)
 	}
@@ -467,13 +512,15 @@ func TestGeneratedFilesGroupedAndCollapsible(t *testing.T) {
 	assertScreen(t, m)
 
 	// h on a generated file closes the generated subgroup and parks on it;
-	// h again climbs back onto the branch.
+	// h again closes the files.
 	m = press(m, "h")
 	if r := hovered(t, m); r.kind != rowGenerated || m.expanded[r.key] {
 		t.Fatalf("h on generated file should collapse subgroup and park on it, got %+v", r)
 	}
 	m = press(m, "h")
-	onBranch(t, m, "two")
+	if r := hovered(t, m); r.kind != rowSection || r.section != secFiles || m.expanded[r.key] {
+		t.Fatalf("h on the generated group should close the files, got %+v", r)
+	}
 }
 
 func TestCachedPRsShowUntilGitHubAnswers(t *testing.T) {
@@ -488,14 +535,14 @@ func TestCachedPRsShowUntilGitHubAnswers(t *testing.T) {
 		at:    at,
 	})
 	m = next.(Model)
-	header := ansi.Strip(strings.Join(m.headerLines(), "\n"))
+	header := ansi.Strip(m.render())
 	if m.prs["two"].Title != "Cached title" || !strings.Contains(header, "cached 5m ago") {
 		t.Fatalf("cached PRs should show, header %q", header)
 	}
 
 	next, _ = m.Update(remoteLoadedMsg{prs: live, at: testNow})
 	m = next.(Model)
-	header = ansi.Strip(strings.Join(m.headerLines(), "\n"))
+	header = ansi.Strip(m.render())
 	if m.prs["two"].Title != "Second layer" || strings.Contains(header, "cached") {
 		t.Fatalf("GitHub's answer should replace the cache, header %q", header)
 	}

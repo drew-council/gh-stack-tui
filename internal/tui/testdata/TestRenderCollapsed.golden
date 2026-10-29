@@ -1,40 +1,40 @@
-gh stack #7 1/2  on main · 7 branches (2 merged) · at auth/rate-limit  ↻ 12s ago
-
-├ auth/docs  +40 -3
-│  ▸ 1 file changed
-│  ▸ 1 commit
-│
-├ ⚠ #106 DRAFT  ● checks  Write an audit log entry for each login
-┊ auth/audit-log  +106 -2
-┊  ▸ 2 files changed
-┊  ▸ 1 commit
-┊  ▸ 3 checks  2 running · 1 passed
-┊
-▶ ○ #105 OPEN  ✗ checks  conflicts  Rate limit login attempts per account
-│ auth/rate-limit (current)  +394 -83
-│ changes requested · 3 unresolved comments · 1 bot comment
-│  ▸ 5 files changed
-│  ▸ 4 commits
-│  ▸ 6 checks  2 failed · 1 running · 3 passed
-│
-├ ○ #104 OPEN  ✓ checks  Require a session on every API route
-│ auth/middleware  +242 -6
-│ approved · 1 unresolved comment
-│  ▸ 3 files changed
-│  ▸ 3 commits
-│  ▸ 4 checks  4 passed
-│
-├ ◎ #103 QUEUED  Refresh access tokens before they expire
-│ auth/token-refresh  +184 -12
-│ approved
-│  ▸ 2 files changed
-│  ▸ 2 commits
-│  ▸ 3 checks  3 passed
-│
-──── merged ─────
-├ ✓ #102 MERGED  Back sessions with Redis
-│ auth/redis-sessions
-│
-├ ✓ #101 MERGED  Extract a session store interface
-│ auth/session-store
-j/k navigate  l/h expand  o open  y copy  c checkout  p push  s sync  R review …
+ ╭─ #7 on main · 1/2 ─────────────────────────────────────────────── ↻ 12s ago ─╮
+ │ ○ auth/docs                                                           +40 -3 │
+ │ │ ▸ 1 file                                                                   │
+ │ │ ▸ 1 commit                                                                 │
+ │ │                                                                            │
+ │ ○ auth/audit-log                                                     +106 -2 │
+ │ ┊ #106 Write an audit log entry for each login                         draft │
+ │ ┊ needs rebase                                                   ● 2 running │
+ │ ┊ ▸ 2 files                                                                  │
+ │ ┊ ▸ 1 commit                                                                 │
+ │ ┊ ▸ 3 checks                                                                 │
+ │ ┊                                                                            │
+█│ ● auth/rate-limit                                                   +394 -83 │
+█│ │ #105 Rate limit login attempts per account               changes requested │
+█│ │ conflicts · 3 unresolved · 1 bot                   ✗ 2 failing ● 1 running │
+█│ │ ▸ 5 files + 1 generated                                                    │
+█│ │ ▸ 4 commits                                                                │
+█│ │ ▸ 6 checks                                                                 │
+█│ │                                                                            │
+ │ ○ auth/middleware                                                    +242 -6 │
+ │ │ #104 Require a session on every API route                         approved │
+ │ │ 1 unresolved                                                     ✓ passing │
+ │ │ ▸ 3 files + 1 generated                                                    │
+ │ │ ▸ 3 commits                                                                │
+ │ │ ▸ 4 checks                                                                 │
+ │ │                                                                            │
+ │ ◎ auth/token-refresh                                                +184 -12 │
+ │ │ #103 Refresh access tokens before they expire                       queued │
+ │ │                                                                  ✓ passing │
+ │ │ ▸ 2 files                                                                  │
+ │ │ ▸ 2 commits                                                                │
+ │ │ ▸ 3 checks                                                                 │
+ │ │                                                                            │
+ │ ── merged ────────────────────────────────────────────────────────────────── │
+ │ ✓ auth/redis-sessions  #102 Back sessions with Redis                  merged │
+ │ ✓ auth/session-store  #101 Extract a session store interface          merged │
+ │ └ main                                                                       │
+ │                                                                              │
+ ╰──────────────────────────────────────────────────────────────────────────────╯
+  j/k move  l in  f/C/x files/commits/checks  o browser  c checkout  ? help

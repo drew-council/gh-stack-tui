@@ -1,7 +1,9 @@
 package tui
 
 import (
+	"fmt"
 	"image/color"
+	"strings"
 
 	"charm.land/lipgloss/v2"
 	catppuccin "github.com/catppuccin/go"
@@ -10,41 +12,36 @@ import (
 )
 
 // styles is the palette and the styles built from it. Colors come from
-// Catppuccin Mocha, so the TUI matches other Catppuccin-themed tools; the
-// layout and the role of each color follow gh stack view.
+// Catppuccin Mocha, so the TUI matches other Catppuccin-themed tools. Color
+// marks state that needs attention; everything else is primary or muted ink.
 type styles struct {
-	text, muted, border, accent color.Color
-	green, gray, yellow, peach  color.Color
-	mauve, red, teal, onFill    color.Color
+	text, muted, faint, border, accent color.Color
+	green, yellow, peach, mauve        color.Color
+	red, teal, onFill                  color.Color
+
+	// Backgrounds. See rowBg for when each is used.
+	blockBg, cursorBg, selBg, selCursorBg color.Color
 
 	normal lipgloss.Style // primary ink
 	dim    lipgloss.Style // secondary ink: labels, hints, timestamps
+	faintS lipgloss.Style // tertiary ink: counts of collapsed sections
 
 	// Tree
-	conn        lipgloss.Style // connector lines and bullets
-	connDashed  lipgloss.Style // needs-rebase connector
-	connFocus   lipgloss.Style // connector of the hovered branch
-	connCurrent lipgloss.Style // hovered branch that is checked out
-	connMerged  lipgloss.Style
-	connQueued  lipgloss.Style
+	conn       lipgloss.Style // connector lines
+	connDashed lipgloss.Style // needs-rebase connector
+	connActive lipgloss.Style // connector of the hovered branch
 
 	branch        lipgloss.Style
 	branchCurrent lipgloss.Style
 	branchMerged  lipgloss.Style
 	trunk         lipgloss.Style
+	prNum         lipgloss.Style
 
-	// PR state
-	prLink   lipgloss.Style
-	prOpen   lipgloss.Style
-	prMerged lipgloss.Style
-	prClosed lipgloss.Style
-	prDraft  lipgloss.Style
-	prQueued lipgloss.Style
+	bulletCurrent lipgloss.Style
+	bulletMerged  lipgloss.Style
+	bulletQueued  lipgloss.Style
 
-	iconOpen   lipgloss.Style
-	iconMerged lipgloss.Style
-	iconQueued lipgloss.Style
-	iconWarn   lipgloss.Style
+	selection lipgloss.Style // marks of a branch selected for review
 
 	add lipgloss.Style
 	del lipgloss.Style
@@ -55,7 +52,8 @@ type styles struct {
 	err  lipgloss.Style
 	bot  lipgloss.Style // comments from bots such as Copilot
 
-	selected lipgloss.Style // review-selection pill
+	selected lipgloss.Style // pill for the selection mode
+	note     lipgloss.Style // flash that is neither success nor error
 	match    lipgloss.Style // fuzzy-matched characters
 
 	// Chrome
@@ -72,47 +70,43 @@ func newStyles() styles {
 	f := catppuccin.Mocha
 	c := func(col catppuccin.Color) color.Color { return lipgloss.Color(col.Hex) }
 	s := styles{
-		text:   c(f.Text()),
-		muted:  c(f.Subtext0()),
-		border: c(f.Surface2()),
-		accent: c(f.Blue()),
-		green:  c(f.Green()),
-		gray:   c(f.Overlay1()),
-		yellow: c(f.Yellow()),
-		peach:  c(f.Peach()),
-		mauve:  c(f.Mauve()),
-		red:    c(f.Red()),
-		teal:   c(f.Teal()),
-		onFill: c(f.Base()),
+		text:     c(f.Text()),
+		muted:    c(f.Subtext0()),
+		faint:    c(f.Overlay1()),
+		border:   c(f.Surface2()),
+		accent:   c(f.Blue()),
+		green:    c(f.Green()),
+		yellow:   c(f.Yellow()),
+		peach:    c(f.Peach()),
+		mauve:    c(f.Mauve()),
+		red:      c(f.Red()),
+		teal:     c(f.Teal()),
+		onFill:   c(f.Base()),
+		cursorBg: c(f.Surface1()),
 	}
+	s.blockBg = blend(c(f.Base()), c(f.Surface0()), 0.5)
+	s.selBg = blend(c(f.Base()), s.mauve, 0.18)
+	s.selCursorBg = blend(c(f.Base()), s.mauve, 0.34)
 	fg := func(col color.Color) lipgloss.Style { return lipgloss.NewStyle().Foreground(col) }
 
 	s.normal = fg(s.text)
 	s.dim = fg(s.muted)
+	s.faintS = fg(s.faint)
 
 	s.conn = fg(s.border)
 	s.connDashed = fg(s.peach)
-	s.connFocus = fg(s.text)
-	s.connCurrent = fg(s.accent)
-	s.connMerged = fg(s.mauve)
-	s.connQueued = fg(s.peach)
+	s.connActive = fg(s.accent)
 
-	s.branch = fg(s.text)
+	s.branch = fg(s.text).Bold(true)
 	s.branchCurrent = fg(s.accent).Bold(true)
 	s.branchMerged = fg(s.muted)
 	s.trunk = fg(s.muted).Italic(true)
+	s.prNum = fg(s.faint)
 
-	s.prLink = fg(s.text).Underline(true)
-	s.prOpen = fg(s.green)
-	s.prMerged = fg(s.mauve)
-	s.prClosed = fg(s.red)
-	s.prDraft = fg(s.gray)
-	s.prQueued = fg(s.peach)
-
-	s.iconOpen = fg(s.green)
-	s.iconMerged = fg(s.mauve)
-	s.iconQueued = fg(s.peach)
-	s.iconWarn = fg(s.peach)
+	s.bulletCurrent = fg(s.accent)
+	s.selection = fg(s.mauve)
+	s.bulletMerged = fg(s.green)
+	s.bulletQueued = fg(s.peach)
 
 	s.add = fg(s.green)
 	s.del = fg(s.red)
@@ -125,35 +119,75 @@ func newStyles() styles {
 
 	s.selected = lipgloss.NewStyle().
 		Foreground(s.onFill).
-		Background(s.green).
+		Background(s.mauve).
 		Bold(true).
 		Padding(0, 1)
 
 	s.match = fg(s.accent).Bold(true)
 
 	s.title = fg(s.text).Bold(true)
-	s.key = fg(s.text)
+	s.key = fg(s.accent)
 	s.keyDesc = fg(s.muted)
 	s.rule = fg(s.border)
 	s.prompt = fg(s.accent)
 	s.flashOK = fg(s.green)
 	s.flashErr = fg(s.red)
+	s.note = fg(s.muted)
 	return s
 }
 
-// Glyphs follow gh stack view.
+// shade paints line's background. Styled segments end in a full reset, so
+// the background is set again after each one. A nil bg leaves line as is.
+func shade(line string, bg color.Color) string {
+	if bg == nil {
+		return line
+	}
+	seq := bgSeq(bg)
+	line = strings.ReplaceAll(line, "\x1b[0m", "\x1b[m")
+	return seq + strings.ReplaceAll(line, "\x1b[m", "\x1b[m"+seq) + "\x1b[m"
+}
+
+// lift brightens secondary and tertiary ink in line one step each, for the
+// row under the cursor.
+func (s styles) lift(line string) string {
+	return strings.NewReplacer(
+		fgSeq(s.muted), fgSeq(s.text),
+		fgSeq(s.faint), fgSeq(s.muted),
+	).Replace(line)
+}
+
+// fgSeq is the escape sequence that sets the foreground to c.
+func fgSeq(c color.Color) string {
+	r, g, b, _ := c.RGBA()
+	return fmt.Sprintf("\x1b[38;2;%d;%d;%dm", r>>8, g>>8, b>>8)
+}
+
+// bgSeq is the escape sequence that sets the background to c.
+func bgSeq(c color.Color) string {
+	r, g, b, _ := c.RGBA()
+	return fmt.Sprintf("\x1b[48;2;%d;%d;%dm", r>>8, g>>8, b>>8)
+}
+
+// blend mixes t of top into base.
+func blend(base, top color.Color, t float64) color.Color {
+	br, bg, bb, _ := base.RGBA()
+	tr, tg, tb, _ := top.RGBA()
+	mix := func(lo, hi uint32) uint8 { return uint8(float64(lo>>8)*(1-t) + float64(hi>>8)*t + 0.5) }
+	return color.RGBA{mix(br, tr), mix(bg, tg), mix(bb, tb), 0xff}
+}
+
 const (
-	glyphOpen      = "○"
-	glyphMerged    = "✓"
-	glyphQueued    = "◎"
-	glyphWarn      = "⚠"
-	glyphCollapsed = "▸"
-	glyphExpanded  = "▾"
-	glyphFocus     = "▶"
-	glyphBullet    = "├"
-	glyphTrunk     = "└"
-	glyphConn      = "│"
-	glyphDashed    = "┊"
+	glyphBranch          = "○"
+	glyphCurrent         = "●"
+	glyphSelectedCurrent = "◆"
+	glyphSelected        = "◇"
+	glyphMerged          = "✓"
+	glyphQueued          = "◎"
+	glyphCollapsed       = "▸"
+	glyphExpanded        = "▾"
+	glyphTrunk           = "└"
+	glyphConn            = "│"
+	glyphDashed          = "┊"
 )
 
 func (s styles) checkGlyph(st github.CheckState) string {

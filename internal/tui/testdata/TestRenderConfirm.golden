@@ -1,0 +1,30 @@
+ ╭─ #7 on main · 1/2 ─────────────────────── ↻ 12s ago ─╮
+ │ ○ auth/audit-log                             +106 -2 │
+ │ ┊ #106 Write an audit log entry for each login       │
+ │ ┊                                              draft │
+ │ ┊ needs rebase                           ● 2 running │
+ │ ┊ ▸ 2 files                                          │
+ │ ┊ ▸ 1 commit                                         │
+ │ ┊ ▸ 3 checks                                         │
+ │ ┊                                                    │
+ │ ● auth/rate-limit                           +394 -83 │
+ │ │ #105 Rate limit login attempts per account         │
+ │ │                                  changes requested │
+ │ │ conflicts · 3 unresolved · 1 bot                   │
+ │ │                            ✗ 2 failing ● 1 running │
+ │ │ ▸ 5 files + 1 generated                            │
+ │ │ ▸ 4 commits                                        │
+ │ │ ▸ 6 checks                                         │
+ │ │                                                    │
+█│ ○ auth/middleware                            +242 -6 │
+█│ │ #104 Require a session on every API route          │
+█│ │                                           approved │
+█│ │ 1 unresolved                             ✓ passing │
+█│ │ ▸ 3 files + 1 generated                            │
+█│ │ ▸ 3 commits                                        │
+█│ │ ▸ 4 checks                                         │
+█│ │                                                    │
+ ╰───────────────────────────────────────────── ↑4 ↓12 ─╯
+  merge #104 and 1 PR below it?
+  y last-used method  s squash  m merge commit  r rebase
+  n no

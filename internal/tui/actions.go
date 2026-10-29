@@ -231,7 +231,7 @@ func (m Model) finishOp(msg opDoneMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case cancelled:
 		m.outputState = opCancelled
-		flash = m.setFlash(msg.title+" cancelled", false)
+		flash = m.setNote(msg.title + " cancelled")
 	case msg.err != nil:
 		m.queue = nil
 		m.outputState = opFailed

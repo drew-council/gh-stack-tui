@@ -16,7 +16,9 @@ const (
 )
 
 type confirmState struct {
-	text    string
+	text string
+	// keys are key and label pairs, shown as hints under text.
+	keys    []string
 	actions map[string]func(*Model) tea.Cmd
 	// cancel runs when the key is not one of the actions. A wizard uses it to
 	// move on to the next step; nil cancels.
@@ -42,8 +44,8 @@ var helpSections = []helpSection{
 		{"[ ]", "prev/next stack"},
 	}},
 	{"expand", [][2]string{
-		{"l → enter", "expand / go into"},
-		{"h ←", "collapse / go back"},
+		{"l → enter", "one level in, opening it"},
+		{"h ←", "one level out, closing it"},
 		{"f", "files"},
 		{"C", "commits"},
 		{"x", "CI checks"},
@@ -76,6 +78,15 @@ var helpSections = []helpSection{
 		{"v", "visual range"},
 		{"R", "review selection in tuicr (one branch: its PR)"},
 	}},
+	{"symbols", [][2]string{
+		{"● ○", "checked out / other branch"},
+		{"◆ ◇", "selected: checked out / other"},
+		{"◎ ✓", "in merge queue / merged"},
+		{"┊", "needs a rebase onto its parent"},
+		{"✓ ✗ ●", "checks passed / failed / running"},
+		{"M A D R", "file modified / added / deleted / renamed"},
+		{"N bot", "unresolved threads started by bots"},
+	}},
 	{"other", [][2]string{
 		{"ctrl+r", "refresh now"},
 		{"!", "toggle output"},
@@ -100,7 +111,25 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	switch m.mode {
 	case modeHelp:
-		m.mode = modeNormal
+		half := max(1, m.bodyHeight()/2)
+		switch key {
+		case "j", "down":
+			m.helpScroll++
+		case "k", "up":
+			m.helpScroll--
+		case "ctrl+d":
+			m.helpScroll += half
+		case "ctrl+u":
+			m.helpScroll -= half
+		case "g":
+			m.helpScroll = 0
+		case "G":
+			m.helpScroll = len(m.helpLines())
+		default:
+			m.mode = modeNormal
+			return m, nil
+		}
+		m.helpScroll = m.helpTop(len(m.helpLines()), m.bodyHeight())
 		return m, nil
 	case modePrompt:
 		return m.handlePromptKey(msg)
@@ -113,7 +142,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if c.cancel != nil {
 			return m, c.cancel(&m)
 		}
-		return m, m.setFlash("cancelled", false)
+		return m, m.setNote("cancelled")
 	}
 
 	if m.pendingKey != "" {
@@ -127,7 +156,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "q":
 		return m, tea.Quit
 	case "?":
-		m.mode = modeHelp
+		m.mode, m.helpScroll = modeHelp, 0
 	case "esc":
 		switch {
 		case m.visual || len(m.marks) > 0:
@@ -334,9 +363,9 @@ func (m *Model) rebuild() {
 	m.restoreCursor(fallback)
 }
 
-// expand is l and enter. On a branch it goes into the branch's items when
-// any section is open, and opens every section otherwise. On a workflow it
-// toggles the workflow's checks. Enter on any other item opens it.
+// expand is l and enter, and goes one level in. On a branch it moves onto the
+// branch's first section. On a section, workflow, or generated group it opens
+// it and moves onto its first entry. Enter on any other item opens it.
 func (m *Model) expand(enter bool) tea.Cmd {
 	r, ok := m.hovered()
 	if !ok {
@@ -344,59 +373,61 @@ func (m *Model) expand(enter bool) tea.Cmd {
 	}
 	switch r.kind {
 	case rowBranch:
-		if i := m.firstItem(r.branch); i >= 0 {
+		if i := m.cursor + 1; i < len(m.rows) && m.rows[i].kind == rowSection {
 			m.setCursor(i)
-			return nil
 		}
-		m.setBranchExpanded(m.snap.Branches[r.branch].Name, true)
-	case rowWorkflow, rowGenerated:
-		m.expanded[r.key] = !m.expanded[r.key]
+	case rowSection, rowWorkflow, rowGenerated:
+		m.expanded[r.key] = true
+		m.rebuild()
+		if i := m.cursor + 1; i < len(m.rows) && m.rows[i].item() &&
+			m.parentKey(m.rows[i]) == r.key {
+			m.setCursor(i)
+		}
 	default:
 		if enter {
 			return m.openHovered()
 		}
-		return nil
 	}
-	m.rebuild()
 	return nil
 }
 
-// collapse is h. On a branch it closes every section. On a check or generated
-// file it closes the group and parks on it; on any other item it goes back to
-// the branch.
+// collapse is h, and goes one level out, the reverse of expand. From an entry
+// it closes the group the entry is in and moves onto it, and from a section
+// it goes back to the branch. An open group under the cursor closes first. On
+// a branch it closes every section.
 func (m *Model) collapse() {
 	r, ok := m.hovered()
 	if !ok {
 		return
 	}
-	switch r.kind {
-	case rowBranch:
+	switch {
+	case r.kind == rowBranch:
 		m.setBranchExpanded(m.snap.Branches[r.branch].Name, false)
-		m.rebuild()
-	case rowWorkflow, rowGenerated:
-		if m.expanded[r.key] {
-			m.expanded[r.key] = false
-			m.rebuild()
-			return
-		}
-		m.setCursor(m.branchRow(r.branch))
-	case rowCheck:
-		wk := workflowKey(m.snap.Branches[r.branch].Name, r.workflow.Name)
-		m.expanded[wk] = false
-		m.cursorKey = wk
-		m.rebuild()
-	case rowFile:
-		if r.file.Generated {
-			gk := generatedKey(m.snap.Branches[r.branch].Name)
-			m.expanded[gk] = false
-			m.cursorKey = gk
-			m.rebuild()
-			return
-		}
-		m.setCursor(m.branchRow(r.branch))
+	case (r.kind == rowSection || r.kind == rowWorkflow || r.kind == rowGenerated) &&
+		m.expanded[r.key]:
+		m.expanded[r.key] = false
 	default:
-		m.setCursor(m.branchRow(r.branch))
+		parent := m.parentKey(r)
+		if r.kind != rowSection {
+			m.expanded[parent] = false
+		}
+		m.cursorKey = parent
 	}
+	m.rebuild()
+}
+
+// parentKey is the key of the row one level above item r.
+func (m *Model) parentKey(r row) string {
+	name := m.snap.Branches[r.branch].Name
+	switch {
+	case r.kind == rowCheck:
+		return workflowKey(name, r.workflow.Name)
+	case r.kind == rowFile && r.file.Generated:
+		return generatedKey(name)
+	case r.kind == rowSection:
+		return branchKey(name)
+	}
+	return sectionKey(name, sectionOf(r))
 }
 
 func (m *Model) toggleSection(section string) {
@@ -407,15 +438,17 @@ func (m *Model) toggleSection(section string) {
 	name := m.snap.Branches[bi].Name
 	k := sectionKey(name, section)
 	m.expanded[k] = !m.expanded[k]
-	// Closing the section the cursor is inside puts it back on the branch.
+	// Closing the section the cursor is inside puts it on the section.
 	if r, _ := m.hovered(); !m.expanded[k] && sectionOf(r) == section {
-		m.cursorKey = branchKey(name)
+		m.cursorKey = k
 	}
 	m.rebuild()
 }
 
 func sectionOf(r row) string {
 	switch r.kind {
+	case rowSection:
+		return r.section
 	case rowFile, rowGenerated:
 		return secFiles
 	case rowCommit:
@@ -511,6 +544,10 @@ func (m *Model) openHovered() tea.Cmd {
 	switch r.kind {
 	case rowBranch:
 		url = pr
+	case rowSection:
+		if pr != "" {
+			url = pr + "/" + r.section
+		}
 	case rowFile:
 		if pr != "" {
 			url = pr + "/files" + fileAnchor(r.file.Path)
@@ -584,7 +621,7 @@ func (m *Model) yankHovered() tea.Cmd {
 	}
 	b := m.snap.Branches[r.branch]
 	switch r.kind {
-	case rowBranch:
+	case rowBranch, rowSection:
 		return copyToClipboard(b.Name, b.Name)
 	case rowFile:
 		return copyToClipboard(r.file.Path, r.file.Path)
@@ -674,7 +711,7 @@ func (m *Model) confirmMerge() tea.Cmd {
 	}
 	text := fmt.Sprintf("merge #%d", n)
 	if below > 0 {
-		text += fmt.Sprintf(" and %d PR(s) below it", below)
+		text += " and " + plural(below, "PR", "PRs") + " below it"
 	}
 	title := fmt.Sprintf("merge #%d", n)
 	merge := func(flags ...string) func(*Model) tea.Cmd {
@@ -685,7 +722,10 @@ func (m *Model) confirmMerge() tea.Cmd {
 	}
 	m.mode = modeConfirm
 	m.confirm = &confirmState{
-		text: text + "?  [y] last-used method  [s]quash  [m]erge commit  [r]ebase  [n]o",
+		text: text + "?",
+		keys: []string{
+			"y", "last-used method", "s", "squash", "m", "merge commit", "r", "rebase", "n", "no",
+		},
 		actions: map[string]func(*Model) tea.Cmd{
 			"y": merge(),
 			"s": merge("--squash"),
@@ -803,7 +843,8 @@ func (m *Model) confirmUnstack() tea.Cmd {
 	}
 	m.mode = modeConfirm
 	m.confirm = &confirmState{
-		text: "unstack?  [y] locally and on GitHub  [l]ocal only  [n]o",
+		text: "unstack?",
+		keys: []string{"y", "locally and on GitHub", "l", "local only", "n", "no"},
 		actions: map[string]func(*Model) tea.Cmd{
 			"y": func(m *Model) tea.Cmd { return m.stackOp("unstack", "unstack") },
 			"l": func(m *Model) tea.Cmd { return m.stackOp("unstack --local", "unstack", "--local") },
