@@ -15,7 +15,7 @@ import (
 type styles struct {
 	text, muted, border, accent color.Color
 	green, gray, yellow, peach  color.Color
-	mauve, red, onFill          color.Color
+	mauve, red, teal, onFill    color.Color
 
 	normal lipgloss.Style // primary ink
 	dim    lipgloss.Style // secondary ink: labels, hints, timestamps
@@ -53,6 +53,7 @@ type styles struct {
 	ok   lipgloss.Style
 	warn lipgloss.Style
 	err  lipgloss.Style
+	bot  lipgloss.Style // comments from bots such as Copilot
 
 	selected lipgloss.Style // review-selection pill
 	match    lipgloss.Style // fuzzy-matched characters
@@ -81,6 +82,7 @@ func newStyles() styles {
 		peach:  c(f.Peach()),
 		mauve:  c(f.Mauve()),
 		red:    c(f.Red()),
+		teal:   c(f.Teal()),
 		onFill: c(f.Base()),
 	}
 	fg := func(col color.Color) lipgloss.Style { return lipgloss.NewStyle().Foreground(col) }
@@ -119,6 +121,7 @@ func newStyles() styles {
 	s.ok = fg(s.green)
 	s.warn = fg(s.peach)
 	s.err = fg(s.red)
+	s.bot = fg(s.teal)
 
 	s.selected = lipgloss.NewStyle().
 		Foreground(s.onFill).

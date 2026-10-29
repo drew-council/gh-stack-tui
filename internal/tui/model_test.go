@@ -60,7 +60,7 @@ func testModel() Model {
 	}
 	m.prs = map[string]*github.PR{"two": {
 		Number: 2, URL: "https://github.com/o/r/pull/2", State: "OPEN", Title: "Second layer",
-		Approvals: 1, Unresolved: 2,
+		Approvals: 1, Unresolved: 2, UnresolvedBots: 1,
 		Checks: github.Rollup{State: github.CheckFailure, Workflows: []github.Workflow{
 			{
 				Name:   "ci",
@@ -430,7 +430,7 @@ func TestRenderLayout(t *testing.T) {
 		"│",
 		"├ ○ #2 OPEN  ✗ checks  Second layer",
 		"│ two (current)  +12 -0",
-		"│ approved · 2 unresolved comments",
+		"│ approved · 2 unresolved comments · 1 bot comment",
 		"│  ▾ 2 files changed",
 		"│    a.go  +3 -0",
 		"│  ▶ b.go  +9 -0",
@@ -488,7 +488,7 @@ func TestGeneratedFilesGroupedAndCollapsible(t *testing.T) {
 		"│",
 		"├ ○ #2 OPEN  ✗ checks  Second layer",
 		"│ two (current)  +12 -0",
-		"│ approved · 2 unresolved comments",
+		"│ approved · 2 unresolved comments · 1 bot comment",
 		"│  ▾ 2 files changed",
 		"│    a.go  +3 -0",
 		"│    b.go  +9 -0",

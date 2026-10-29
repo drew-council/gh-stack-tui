@@ -49,8 +49,10 @@ type PR struct {
 	// repository does not require reviews.
 	Approvals        int
 	ChangesRequested int
-	// Unresolved is the number of review threads still open.
-	Unresolved int
+	// Unresolved is the number of open review threads started by people,
+	// UnresolvedBots by bots such as Copilot.
+	Unresolved     int
+	UnresolvedBots int
 	// Reviewers are the people other than the author who were asked to
 	// review or have reviewed. RequestedTeams are the teams asked to review,
 	// such as CODEOWNERS teams.
@@ -101,7 +103,8 @@ const prFields = `number url title state isDraft merged reviewDecision mergeStat
   latestReviews(first: 25) { nodes { author { __typename login } } }
   reviewRequests(first: 25) { nodes { requestedReviewer {
     __typename ... on User { login } ... on Team { slug } } } }
-  reviewThreads(first: 100) { nodes { isResolved } }
+  reviewThreads(first: 100) { nodes { isResolved
+    comments(first: 1) { nodes { author { __typename login } } } } }
   commits(last: 1) { nodes { commit { oid statusCheckRollup { state contexts(first: 100) { nodes {
     __typename
     ... on CheckRun { name status conclusion detailsUrl startedAt
@@ -327,6 +330,11 @@ type prNode struct {
 	ReviewThreads struct {
 		Nodes []struct {
 			IsResolved bool `json:"isResolved"`
+			Comments   struct {
+				Nodes []struct {
+					Author *actor `json:"author"`
+				} `json:"nodes"`
+			} `json:"comments"`
 		} `json:"nodes"`
 	} `json:"reviewThreads"`
 	Commits struct {
@@ -357,6 +365,11 @@ func (a *actor) user() string {
 		return ""
 	}
 	return a.Login
+}
+
+// bot reports whether a is a bot account, such as Copilot.
+func (a *actor) bot() bool {
+	return a != nil && a.Typename == "Bot"
 }
 
 type contextNode struct {
@@ -409,7 +422,11 @@ func (n *prNode) toPR() *PR {
 		}
 	}
 	for _, t := range n.ReviewThreads.Nodes {
-		if !t.IsResolved {
+		switch {
+		case t.IsResolved:
+		case len(t.Comments.Nodes) > 0 && t.Comments.Nodes[0].Author.bot():
+			pr.UnresolvedBots++
+		default:
 			pr.Unresolved++
 		}
 	}

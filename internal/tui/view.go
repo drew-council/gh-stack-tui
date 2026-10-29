@@ -468,11 +468,19 @@ func (m Model) reviewLine(bi int) string {
 	case github.ReviewChangesRequested:
 		parts = append(parts, s.err.Render("changes requested"))
 	}
-	if pr.Unresolved > 0 && pr.State == "OPEN" {
-		parts = append(
-			parts,
-			s.warn.Render(plural(pr.Unresolved, "unresolved comment", "unresolved comments")),
-		)
+	if pr.State == "OPEN" {
+		if pr.Unresolved > 0 {
+			parts = append(
+				parts,
+				s.warn.Render(plural(pr.Unresolved, "unresolved comment", "unresolved comments")),
+			)
+		}
+		if pr.UnresolvedBots > 0 {
+			parts = append(
+				parts,
+				s.bot.Render(plural(pr.UnresolvedBots, "bot comment", "bot comments")),
+			)
+		}
 	}
 	return strings.Join(parts, s.dim.Render(" · "))
 }
