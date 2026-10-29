@@ -155,12 +155,12 @@ func (m Model) headerLines() []string {
 	case m.loadingRemote:
 		right = m.spinner.View() + s.dim.Render(" refreshing")
 		if !m.cachedAt.IsZero() {
-			right += s.dim.Render(" · cached " + shortAgo(m.cachedAt))
+			right += s.dim.Render(" · cached " + shortAgo(m.now(), m.cachedAt))
 		}
 	case !m.cachedAt.IsZero():
-		right = s.dim.Render("cached " + shortAgo(m.cachedAt))
+		right = s.dim.Render("cached " + shortAgo(m.now(), m.cachedAt))
 	case !m.lastRemote.IsZero():
-		right = s.dim.Render("↻ " + shortAgo(m.lastRemote))
+		right = s.dim.Render("↻ " + shortAgo(m.now(), m.lastRemote))
 	}
 	lines := []string{spread(left, right, m.width)}
 	// Working tree state goes on its own line so the title fits a narrow
@@ -355,7 +355,7 @@ func (m Model) renderRow(r row, cursor, active bool) []string {
 		subject := truncateRight(c.Subject, m.width-35)
 		return []string{
 			line + indent(4) + s.sha.Render(c.SHA[:min(7, len(c.SHA))]) + " " +
-				s.normal.Render(subject) + "  " + s.dim.Render(timeAgo(c.Time)),
+				s.normal.Render(subject) + "  " + s.dim.Render(timeAgo(m.now(), c.Time)),
 		}
 
 	case rowWorkflow:
@@ -565,8 +565,8 @@ func truncateRight(s string, maxLen int) string {
 }
 
 // timeAgo matches gh stack view's wording for commit times.
-func timeAgo(t time.Time) string {
-	d := time.Since(t)
+func timeAgo(now, t time.Time) string {
+	d := now.Sub(t)
 	n, unit := 0, ""
 	switch {
 	case d < time.Minute:
@@ -587,8 +587,8 @@ func timeAgo(t time.Time) string {
 }
 
 // shortAgo is the compact form used for the refresh indicator.
-func shortAgo(t time.Time) string {
-	d := time.Since(t)
+func shortAgo(now, t time.Time) string {
+	d := now.Sub(t)
 	switch {
 	case d < time.Minute:
 		return fmt.Sprintf("%ds ago", int(d.Seconds()))
@@ -615,7 +615,7 @@ func (m Model) outputLines() []string {
 	case opRunning:
 		elapsed := ""
 		if m.op != nil {
-			elapsed = fmt.Sprintf(" %ds", int(time.Since(m.op.started).Seconds()))
+			elapsed = fmt.Sprintf(" %ds", int(m.now().Sub(m.op.started).Seconds()))
 		}
 		status = m.spinner.View() + s.warn.Render(" running"+elapsed)
 		if n := len(m.queue); n > 0 {

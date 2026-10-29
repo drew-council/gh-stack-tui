@@ -10,7 +10,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/drew-council/gh-stack-tui/internal/cache"
-	"github.com/drew-council/gh-stack-tui/internal/git"
 	"github.com/drew-council/gh-stack-tui/internal/github"
 	"github.com/drew-council/gh-stack-tui/internal/stack"
 )
@@ -30,6 +29,9 @@ type Options struct {
 	ReviewPRCmd string
 	// ReviewIn picks where the review opens: auto, herdr, tmux, or inline.
 	ReviewIn string
+	// Connect returns the Remote for the stack file's "host:owner/name".
+	// Nil connects to GitHub as the gh CLI's user.
+	Connect func(repository string) (Remote, error)
 	// Cache, when set, shows the last known GitHub state at startup and
 	// keeps the reviewer list between runs. CacheErr is why it is not set.
 	Cache    *cache.Cache
@@ -48,8 +50,8 @@ const (
 
 // Model is the root Bubble Tea model.
 type Model struct {
-	opts Options
-	repo *git.Repo
+	opts  Options
+	local Local
 
 	snap *stack.Snapshot
 	prs  map[string]*github.PR
@@ -70,7 +72,7 @@ type Model struct {
 	reloadRemote  bool
 	fingerprint   string
 	// gh talks to the stack's repository on GitHub, once it is resolved.
-	gh *github.Client
+	gh Remote
 
 	// reviewers are the people who can review PRs in the repository, loaded
 	// in the background after the first remote load, or from the cache.
@@ -118,24 +120,31 @@ type Model struct {
 	flashSeq int
 
 	spinner spinner.Model
+
+	// now is the clock for relative times, fixed in tests.
+	now func() time.Time
 }
 
-// New creates the model for the repository at repo.
-func New(repo *git.Repo, opts Options) Model {
+// New creates the model for the stacks of local.
+func New(local Local, opts Options) Model {
+	if opts.Connect == nil {
+		opts.Connect = connectGitHub
+	}
 	in := textinput.New()
 	in.Prompt = ""
 	in.CharLimit = 256
 	st := newStyles()
 	return Model{
-		opts: opts,
-		repo: repo,
-		st:   st,
+		opts:  opts,
+		local: local,
+		st:    st,
 		// Init starts the first local load.
 		loadingLocal: true,
 		prs:          map[string]*github.PR{},
 		expanded:     map[string]bool{},
 		marks:        map[string]bool{},
 		input:        in,
+		now:          time.Now,
 		spinner: spinner.New(
 			spinner.WithSpinner(spinner.MiniDot),
 			spinner.WithStyle(st.dim),

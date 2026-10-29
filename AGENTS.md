@@ -11,6 +11,8 @@ Agents MAY update this file without asking. When a change makes something here w
 - `internal/cache`: SQLite cache of GitHub results, generated with sqlc.
 - `internal/git`, `internal/stack`: local repository and stack state.
 
+The model reads stacks through the `Local` interface and PRs through `Remote` (`internal/tui/sources.go`). `stack.Source` and `github.Client` implement them.
+
 ## Testing
 
 Run `go test ./...` before finishing a change.

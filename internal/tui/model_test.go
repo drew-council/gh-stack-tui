@@ -16,8 +16,15 @@ import (
 	"github.com/drew-council/gh-stack-tui/internal/stack"
 )
 
+// testNow is the tests' clock.
+var testNow = time.Date(2026, 10, 29, 15, 0, 0, 0, time.UTC)
+
 func testModel() Model {
-	m := New(&git.Repo{}, Options{ReviewCmd: "tuicr -r {range}", ReviewPRCmd: "tuicr pr {pr}"})
+	m := New(
+		stack.NewSource(&git.Repo{}),
+		Options{ReviewCmd: "tuicr -r {range}", ReviewPRCmd: "tuicr pr {pr}"},
+	)
+	m.now = func() time.Time { return testNow }
 	m.width, m.height = 100, 40
 	m.loadingLocal = false
 	m.snap = &stack.Snapshot{
@@ -372,7 +379,7 @@ func TestQueuedStackOpsCheckCheckoutWhenStarting(t *testing.T) {
 	}
 
 	m.op = &opState{title: "checkout"}
-	m.queue = []pendingOp{{title: "true", name: "true", stack: []string{m.repo.CurrentBranch()}}}
+	m.queue = []pendingOp{{title: "true", name: "true", stack: []string{m.local.CurrentBranch()}}}
 	next, _ = m.finishOp(opDoneMsg{title: "checkout"})
 	if m = next.(Model); m.op == nil || m.op.title != "true" {
 		t.Fatalf("op on the checked out stack should start, op %+v", m.op)
@@ -472,7 +479,7 @@ func TestCachedPRsShowUntilGitHubAnswers(t *testing.T) {
 	live := m.prs
 	m.prs = map[string]*github.PR{}
 	m.loadingRemote = true
-	at := time.Now().Add(-5 * time.Minute)
+	at := testNow.Add(-5 * time.Minute)
 	next, _ := m.Update(cachedLoadedMsg{
 		stack: m.snap.Key,
 		prs:   map[string]*github.PR{"two": {Number: 2, State: "OPEN", Title: "Cached title"}},
@@ -484,7 +491,7 @@ func TestCachedPRsShowUntilGitHubAnswers(t *testing.T) {
 		t.Fatalf("cached PRs should show, header %q", header)
 	}
 
-	next, _ = m.Update(remoteLoadedMsg{prs: live, at: time.Now()})
+	next, _ = m.Update(remoteLoadedMsg{prs: live, at: testNow})
 	m = next.(Model)
 	header = ansi.Strip(strings.Join(m.headerLines(), "\n"))
 	if m.prs["two"].Title != "Second layer" || strings.Contains(header, "cached") {

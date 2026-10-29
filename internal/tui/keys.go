@@ -6,8 +6,6 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-
-	"github.com/drew-council/gh-stack-tui/internal/stack"
 )
 
 type promptKind int
@@ -316,11 +314,11 @@ func (m *Model) cycleStack(key string) tea.Cmd {
 		delta = -1
 	}
 	next := (m.snap.Index + delta + m.snap.StackCount) % m.snap.StackCount
-	f, err := stack.ReadFile(m.repo.CommonDir)
-	if err != nil || next >= len(f.Stacks) {
+	refs, err := m.local.Stacks()
+	if err != nil || next >= len(refs) {
 		return m.setFlash("reading stack file failed", true)
 	}
-	m.pinned = stack.Key(f.Stacks[next])
+	m.pinned = refs[next].Key
 	m.pinnedCurrent = m.snap.CurrentBranch
 	return m.requestLocal()
 }
@@ -523,9 +521,9 @@ func (m *Model) openHovered() tea.Cmd {
 		} else if m.gh != nil {
 			url = fmt.Sprintf(
 				"https://%s/%s/%s/commit/%s",
-				m.gh.Repo.Host,
-				m.gh.Repo.Owner,
-				m.gh.Repo.Name,
+				m.gh.Repository().Host,
+				m.gh.Repository().Owner,
+				m.gh.Repository().Name,
 				r.commit.SHA,
 			)
 		}

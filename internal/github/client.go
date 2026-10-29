@@ -51,6 +51,9 @@ func NewClientWith(repo Repo, opts api.ClientOptions) (*Client, error) {
 	return &Client{Repo: repo, gql: gql, rest: rest}, nil
 }
 
+// Repository is the repository the client talks to.
+func (c *Client) Repository() Repo { return c.Repo }
+
 // CurrentRepo returns the GitHub repository that the working directory's git
 // remotes point at, chosen the way gh chooses it.
 func CurrentRepo() (Repo, error) {

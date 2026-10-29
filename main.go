@@ -10,6 +10,7 @@ import (
 
 	"github.com/drew-council/gh-stack-tui/internal/cache"
 	"github.com/drew-council/gh-stack-tui/internal/git"
+	"github.com/drew-council/gh-stack-tui/internal/stack"
 	"github.com/drew-council/gh-stack-tui/internal/tui"
 )
 
@@ -98,7 +99,7 @@ func run(dir string, opts tui.Options) error {
 		opts.Cache, err = cache.Open(cacheDir)
 	}
 	opts.CacheErr = err
-	_, err = tea.NewProgram(tui.New(repo, opts)).Run()
+	_, err = tea.NewProgram(tui.New(stack.NewSource(repo), opts)).Run()
 	opts.Cache.Close()
 	return err
 }

@@ -3,7 +3,6 @@ package tui
 import (
 	"context"
 	"fmt"
-	"os"
 	"slices"
 	"strings"
 	"time"
@@ -27,7 +26,7 @@ type (
 	}
 
 	remoteLoadedMsg struct {
-		client *github.Client
+		client Remote
 		prs    map[string]*github.PR
 		at     time.Time
 		err    error
@@ -77,18 +76,9 @@ func remoteTick(d time.Duration) tea.Cmd {
 // and gh stack commands run in another terminal show up within a poll
 // interval without re-reading every branch's history.
 func (m *Model) fingerprintCmd() tea.Cmd {
-	repo := m.repo
+	local := m.local
 	return func() tea.Msg {
-		var extra []string
-		for _, p := range stack.StateFiles(repo) {
-			if fi, err := os.Stat(p); err == nil {
-				extra = append(
-					extra,
-					fmt.Sprintf("%s %d %d", p, fi.ModTime().UnixNano(), fi.Size()),
-				)
-			}
-		}
-		fp, err := repo.Fingerprint(extra...)
+		fp, err := local.Fingerprint()
 		if err != nil {
 			return nil
 		}
@@ -107,7 +97,7 @@ func (m *Model) requestLocal() tea.Cmd {
 }
 
 func (m *Model) loadLocal() tea.Cmd {
-	repo := m.repo
+	local := m.local
 	pinned := m.pinned
 	previous := ""
 	if m.snap != nil {
@@ -119,13 +109,14 @@ func (m *Model) loadLocal() tea.Cmd {
 	}
 	return func() tea.Msg {
 		if wantNumber != 0 {
-			if f, err := stack.ReadFile(repo.CommonDir); err == nil {
-				if i := stack.FindNumber(f, wantNumber); i >= 0 {
-					pinned = stack.Key(f.Stacks[i])
+			refs, _ := local.Stacks()
+			for _, r := range refs {
+				if r.Number == wantNumber {
+					pinned = r.Key
 				}
 			}
 		}
-		snap, err := stack.Load(repo, pinned, previous)
+		snap, err := local.Load(pinned, previous)
 		return localLoadedMsg{snap: snap, pinned: pinned, err: err}
 	}
 }
@@ -223,7 +214,8 @@ func (m *Model) loadCached() tea.Cmd {
 	ls := lookups(m.snap)
 	var known *github.Repo
 	if m.gh != nil {
-		known = &m.gh.Repo
+		repo := m.gh.Repository()
+		known = &repo
 	}
 	return func() tea.Msg {
 		var repo github.Repo
@@ -293,7 +285,7 @@ func (m *Model) save(write func(c *cache.Cache, repo github.Repo) error) tea.Cmd
 	if m.opts.Cache == nil || m.gh == nil {
 		return nil
 	}
-	c, repo := m.opts.Cache, m.gh.Repo
+	c, repo := m.opts.Cache, m.gh.Repository()
 	return func() tea.Msg {
 		_ = write(c, repo)
 		return nil
@@ -323,15 +315,13 @@ func (m *Model) requestRemote() tea.Cmd {
 	}
 	m.loadingRemote = true
 	client := m.gh
+	connect := m.opts.Connect
 	repository := m.snap.Repository
 	ls := lookups(m.snap)
 	return func() tea.Msg {
 		if client == nil {
-			repo, err := resolveRepo(repository)
-			if err != nil {
-				return remoteLoadedMsg{err: err}
-			}
-			if client, err = github.NewClient(repo); err != nil {
+			var err error
+			if client, err = connect(repository); err != nil {
 				return remoteLoadedMsg{err: err}
 			}
 		}
@@ -371,7 +361,7 @@ func (m Model) applyRemote(msg remoteLoadedMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	m.prs = msg.prs
-	m.lastRemote = time.Now()
+	m.lastRemote = msg.at
 	m.cachedAt = time.Time{}
 	fallback := ""
 	if bi := m.hoveredBranch(); bi >= 0 {
@@ -398,7 +388,7 @@ const reviewersMaxAge = 24 * time.Hour
 // reviewersMaxAge is loaded. A failure is retried after the next remote load.
 func (m *Model) requestReviewers() tea.Cmd {
 	if m.loadingReviewers || m.gh == nil ||
-		(m.reviewersLoaded && time.Since(m.reviewersAt) < reviewersMaxAge) {
+		(m.reviewersLoaded && m.now().Sub(m.reviewersAt) < reviewersMaxAge) {
 		return nil
 	}
 	m.loadingReviewers = true

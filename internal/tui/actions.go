@@ -108,7 +108,7 @@ func (m *Model) next() tea.Cmd {
 	}
 	p := m.queue[0]
 	m.queue = m.queue[1:]
-	if p.stack != nil && !slices.Contains(p.stack, m.repo.CurrentBranch()) {
+	if p.stack != nil && !slices.Contains(p.stack, m.local.CurrentBranch()) {
 		m.queue = nil
 		return m.notCurrentFlash()
 	}
@@ -128,10 +128,10 @@ func (m *Model) cancelOp() bool {
 }
 
 func (m *Model) start(p pendingOp) tea.Cmd {
-	m.op = &opState{title: p.title, started: time.Now(), quiet: p.quiet}
+	m.op = &opState{title: p.title, started: m.now(), quiet: p.quiet}
 	if p.interactive {
 		cmd := exec.Command(p.name, p.args...)
-		cmd.Dir = m.repo.Root
+		cmd.Dir = m.local.Dir()
 		return tea.ExecProcess(
 			cmd,
 			func(err error) tea.Msg { return execDoneMsg{what: p.what, err: err} },
@@ -146,7 +146,7 @@ func (m *Model) start(p pendingOp) tea.Cmd {
 	ctx, cancel := context.WithCancel(context.Background())
 	m.op.cancel = cancel
 	cmd := exec.CommandContext(ctx, name, args...)
-	cmd.Dir = m.repo.Root
+	cmd.Dir = m.local.Dir()
 	cmd.Env = append(
 		os.Environ(),
 		"GH_PROMPT_DISABLED=1",
@@ -513,7 +513,7 @@ func (m *Model) startReview() tea.Cmd {
 
 	m.clearSelection()
 
-	root := m.repo.Root
+	root := m.local.Dir()
 	switch where := reviewTarget(m.opts.ReviewIn); where {
 	case "herdr":
 		return func() tea.Msg {
