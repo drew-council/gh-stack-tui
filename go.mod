@@ -11,6 +11,7 @@ require (
 	github.com/cli/go-gh/v2 v2.16.2
 	github.com/github/gh-stack/shim/ghstack v0.0.0-00010101000000-000000000000
 	github.com/mattn/go-sqlite3 v1.14.52
+	github.com/sebdah/goldie/v2 v2.8.0
 )
 
 require (
@@ -33,8 +34,10 @@ require (
 	github.com/mattn/go-runewidth v0.0.27 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
+	github.com/sergi/go-diff v1.0.0 // indirect
 	github.com/thlib/go-timezone-local v0.0.8 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/sync v0.22.0 // indirect

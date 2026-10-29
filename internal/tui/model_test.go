@@ -9,6 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/sebdah/goldie/v2"
 
 	"github.com/drew-council/gh-stack-tui/internal/git"
 	"github.com/drew-council/gh-stack-tui/internal/github"
@@ -109,6 +110,17 @@ func onBranch(t *testing.T, m Model, name string) {
 	if r.kind != rowBranch || m.snap.Branches[r.branch].Name != name {
 		t.Fatalf("expected the cursor on branch %s, got %+v", name, r)
 	}
+}
+
+// assertScreen compares m's screen, without color or trailing spaces, to
+// testdata/<test name>.golden. Run go test with -update to rewrite it.
+func assertScreen(t *testing.T, m Model) {
+	t.Helper()
+	var lines []string
+	for _, l := range strings.Split(m.render(), "\n") {
+		lines = append(lines, strings.TrimRight(ansi.Strip(l), " "))
+	}
+	goldie.New(t).Assert(t, t.Name(), []byte(strings.Join(lines, "\n")+"\n"))
 }
 
 func TestRowsTopFirstWithMergedSeparator(t *testing.T) {
@@ -417,40 +429,7 @@ func TestDraftToggleRefusals(t *testing.T) {
 
 func TestRenderLayout(t *testing.T) {
 	m := press(testModel(), "f", "x", "l", "j")
-	var lines []string
-	for _, l := range strings.Split(m.render(), "\n") {
-		lines = append(lines, strings.TrimRight(ansi.Strip(l), " "))
-	}
-	t.Log("\n" + strings.Join(lines, "\n"))
-	want := []string{
-		"├ four",
-		"│",
-		"├ three",
-		"│  ▸ 1 file changed",
-		"│",
-		"├ ○ #2 OPEN  ✗ checks  Second layer",
-		"│ two (current)  +12 -0",
-		"│ approved · 2 unresolved comments · 1 bot comment",
-		"│  ▾ 2 files changed",
-		"│    a.go  +3 -0",
-		"│  ▶ b.go  +9 -0",
-		"│  ▸ 1 commit",
-		"│  ▾ 1 check  1 failed",
-		"│    ✗ ci  1 failed",
-		"│",
-		"──── merged ─────",
-		"├ ✓ #1 MERGED",
-		"│ one",
-		"│",
-		"└ main",
-	}
-	top := len(m.headerLines())
-	body := lines[top : top+len(want)]
-	for i := range want {
-		if body[i] != want[i] {
-			t.Fatalf("line %d = %q, want %q\n%s", i, body[i], want[i], strings.Join(body, "\n"))
-		}
-	}
+	assertScreen(t, m)
 }
 
 func TestGeneratedFilesGroupedAndCollapsible(t *testing.T) {
@@ -476,33 +455,7 @@ func TestGeneratedFilesGroupedAndCollapsible(t *testing.T) {
 		t.Fatalf("expected first generated file, got %+v", r)
 	}
 
-	var lines []string
-	for _, l := range strings.Split(m.render(), "\n") {
-		lines = append(lines, strings.TrimRight(ansi.Strip(l), " "))
-	}
-	want := []string{
-		"├ four",
-		"│",
-		"├ three",
-		"│  ▸ 1 file changed",
-		"│",
-		"├ ○ #2 OPEN  ✗ checks  Second layer",
-		"│ two (current)  +12 -0",
-		"│ approved · 2 unresolved comments · 1 bot comment",
-		"│  ▾ 2 files changed",
-		"│    a.go  +3 -0",
-		"│    b.go  +9 -0",
-		"│    ▾ 2 generated files",
-		"│    ▶ a.pb.go  binary",
-		"│      b_gen.go  +100 -0",
-	}
-	top := len(m.headerLines())
-	body := lines[top : top+len(want)]
-	for i := range want {
-		if body[i] != want[i] {
-			t.Fatalf("line %d = %q, want %q\n%s", i, body[i], want[i], strings.Join(body, "\n"))
-		}
-	}
+	assertScreen(t, m)
 
 	// h on a generated file closes the generated subgroup and parks on it;
 	// h again climbs back onto the branch.

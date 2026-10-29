@@ -80,6 +80,14 @@ go run .
 go test ./...
 ```
 
+Rendering tests compare the screen, without color, to golden files in `internal/tui/testdata`. After an intended UI change, rewrite them and review the diff before committing:
+
+```sh
+go test ./internal/tui -update
+```
+
+Pass `-update` to `internal/tui` only. Packages that do not use golden files reject the flag.
+
 The cache's queries are in `internal/cache/queries.sql` and its schema in `internal/cache/schema.sql`. Run `sqlc generate` after changing either; `nix flake check` fails when the generated code is out of date.
 
 This project uses Nix and direnv for a reproducible development environment.
