@@ -1,0 +1,32 @@
+# AGENTS.md
+
+A Bubble Tea TUI for gh-stack. See [README.md](README.md) for features, keys, and development setup.
+
+Agents MAY update this file without asking. When a change makes something here wrong, fix it in the same change. When you learn something a future agent would need, such as a workflow, a pitfall, or a convention, add it. Keep entries short.
+
+## Layout
+
+- `internal/tui`: model, key handling, and rendering.
+- `internal/github`: GraphQL queries and PR, CI, and reviewer state.
+- `internal/cache`: SQLite cache of GitHub results, generated with sqlc.
+- `internal/git`, `internal/stack`: local repository and stack state.
+
+## Testing
+
+Run `go test ./...` before finishing a change.
+
+Tests that assert the whole screen MUST use `assertScreen` in `internal/tui/model_test.go`. It compares the rendered screen, without color, to `internal/tui/testdata/<TestName>.golden`. Tests that check for one piece of text SHOULD keep using `strings.Contains`.
+
+When a UI change is intended, rewrite the golden files:
+
+```sh
+go test ./internal/tui -update
+```
+
+Then read the `git diff` of `testdata` and confirm every change is intended. Never run `-update` just to make a failing test pass. Pass `-update` to `internal/tui` only; packages without golden files reject the flag.
+
+## Generated and pinned files
+
+- After changing `internal/cache/queries.sql` or `internal/cache/schema.sql`, run `sqlc generate`. `nix flake check` fails when the generated code is stale.
+- After changing `go.mod` dependencies, update `vendorHash` in `flake.nix`. Set it to `""`, run `nix build`, and copy the `got:` hash from the error. Then delete the `result` symlink the build leaves behind.
+- Format with `nix fmt`.
