@@ -443,10 +443,11 @@ func TestReviewerPickerWaitsForReviewers(t *testing.T) {
 	}
 	screen := ansi.Strip(m.render())
 	for _, want := range []string{
-		"Request reviewers  #2 Second layer",
+		"Request reviewers",
+		"#2 Second layer",
 		"only teams are requested: go-readability",
 		"2/5",
-		"▶ · bob",
+		"▌ · bob",
 		"38 recent PRs",
 	} {
 		if !strings.Contains(screen, want) {

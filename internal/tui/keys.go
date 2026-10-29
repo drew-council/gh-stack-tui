@@ -76,6 +76,15 @@ var helpSections = []helpSection{
 		{"v", "visual range"},
 		{"R", "review selection in tuicr (one branch: its PR)"},
 	}},
+	{"symbols", [][2]string{
+		{"● ○", "checked out / other branch"},
+		{"◆", "selected for review"},
+		{"◎ ✓", "in merge queue / merged"},
+		{"┊", "needs a rebase onto its parent"},
+		{"✓ ✗ ●", "checks passed / failed / running"},
+		{"M A D R", "file modified / added / deleted / renamed"},
+		{"N bot", "unresolved threads started by bots"},
+	}},
 	{"other", [][2]string{
 		{"ctrl+r", "refresh now"},
 		{"!", "toggle output"},

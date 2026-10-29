@@ -1,40 +1,40 @@
-gh stack  on main · 4 branches (1 merged) · at two
-
-├ four
-│
-├ three
-│  ▸ 1 file changed
-│
-├ ○ #2 OPEN  ✗ checks  Second layer
-│ two (current)  +12 -0
-│ approved · 2 unresolved comments · 1 bot comment
-│  ▾ 2 files changed
-│    a.go  +3 -0
-│    b.go  +9 -0
-│    ▾ 2 generated files
-│    ▶ a.pb.go  binary
-│      b_gen.go  +100 -0
-│  ▸ 1 commit
-│  ▸ 1 check  1 failed
-│
-──── merged ─────
-├ ✓ #1 MERGED
-│ one
-│
-└ main
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-j/k items  h back  o open  y copy  e edit  ? help
+╭─ on main ────────────────────────────────────────────────────────────────────────────────────────╮
+│  ○ four                                                                                          │
+│  │                                                                                               │
+│  ○ three                                                                                         │
+│  │ ▸ 1 file                                                                                      │
+│  │                                                                                               │
+│▏ ● two                                                                                    +12 -0 │
+│▏ │ #2 Second layer                                                                      approved │
+│▏ │ 2 unresolved · 1 bot                                                              ✗ 1 failing │
+│▏ │ ▾ 2 files   ▸ 1 commit   ▸ 1 check                                                            │
+│▏ │   M a.go                                                                                +3 -0 │
+│▏ │   A b.go                                                                                +9 -0 │
+│▏ │   ▾ 2 generated files                                                                         │
+│▌ │     M a.pb.go                                                                          binary │
+│▏ │     A b_gen.go                                                                        +100 -0 │
+│▏ │                                                                                               │
+│  ── merged ───────────────────────────────────────────────────────────────────────────────────── │
+│  ✓ one  #1                                                                                merged │
+│  │                                                                                               │
+│  └ main                                                                                          │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+ j/k items  h back  o open  y copy  e edit  ? help

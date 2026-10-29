@@ -1,64 +1,64 @@
-gh stack #7 1/2  on main · 7 branches (2 merged) · at auth/rate-limit  ↻ 12s ago
-
-navigate
-j/k ↓/↑    prev/next branch
-J/K        prev/next branch (from inside)
-gg/G       top/bottom
-ctrl+d/u   half page
-.          current branch
-[ ]        prev/next stack
-
-expand
-l → enter  expand / go into
-h ←        collapse / go back
-f          files
-C          commits
-x          CI checks
-z / Z      toggle branch / collapse all
-
-branch or item
-o          open PR(s) / item in browser
-y          copy name(s) / path / sha / url
-Y          copy changed file paths
-e          edit file in $EDITOR
-c          checkout branch
-M          merge PR (and below)
-D          toggle PR(s) draft / ready (selection or hovered)
-A          ask reviewers (selection or hovered, draft or ready)
-
-stack
-p          push
-s          sync
-P          sync --prune
-S          submit --auto
-rr ru rd   rebase all/upstack/downstack
-rc ra      rebase continue/abort
-a          add branch
-m          modify (interactive)
-u          unstack
-:          run gh stack …
-
-review
-space      mark branch
-v          visual range
-R          review selection in tuicr (one branch: its PR)
-
-other
-ctrl+r     refresh now
-!          toggle output
-esc        clear / close
-ctrl+c     cancel running op and queue / quit
-?          help
-q          quit
-
-
-
-
-
-
-
-
-
-
-
-press any key to close help
+╭─ Keys ───────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│  navigate                                                                    │
+│  j/k ↓/↑    prev/next branch                                                 │
+│  J/K        prev/next branch (from inside)                                   │
+│  gg/G       top/bottom                                                       │
+│  ctrl+d/u   half page                                                        │
+│  .          current branch                                                   │
+│  [ ]        prev/next stack                                                  │
+│                                                                              │
+│  expand                                                                      │
+│  l → enter  expand / go into                                                 │
+│  h ←        collapse / go back                                               │
+│  f          files                                                            │
+│  C          commits                                                          │
+│  x          CI checks                                                        │
+│  z / Z      toggle branch / collapse all                                     │
+│                                                                              │
+│  branch or item                                                              │
+│  o          open PR(s) / item in browser                                     │
+│  y          copy name(s) / path / sha / url                                  │
+│  Y          copy changed file paths                                          │
+│  e          edit file in $EDITOR                                             │
+│  c          checkout branch                                                  │
+│  M          merge PR (and below)                                             │
+│  D          toggle PR(s) draft / ready (selection or hovered)                │
+│  A          ask reviewers (selection or hovered, draft or ready)             │
+│                                                                              │
+│  stack                                                                       │
+│  p          push                                                             │
+│  s          sync                                                             │
+│  P          sync --prune                                                     │
+│  S          submit --auto                                                    │
+│  rr ru rd   rebase all/upstack/downstack                                     │
+│  rc ra      rebase continue/abort                                            │
+│  a          add branch                                                       │
+│  m          modify (interactive)                                             │
+│  u          unstack                                                          │
+│  :          run gh stack …                                                   │
+│                                                                              │
+│  review                                                                      │
+│  space      mark branch                                                      │
+│  v          visual range                                                     │
+│  R          review selection in tuicr (one branch: its PR)                   │
+│                                                                              │
+│  symbols                                                                     │
+│  ● ○        checked out / other branch                                       │
+│  ◆          selected for review                                              │
+│  ◎ ✓        in merge queue / merged                                          │
+│  ┊          needs a rebase onto its parent                                   │
+│  ✓ ✗ ●      checks passed / failed / running                                 │
+│  M A D R    file modified / added / deleted / renamed                        │
+│  N bot      unresolved threads started by bots                               │
+│                                                                              │
+│  other                                                                       │
+│  ctrl+r     refresh now                                                      │
+│  !          toggle output                                                    │
+│  esc        clear / close                                                    │
+│  ctrl+c     cancel running op and queue / quit                               │
+│  ?          help                                                             │
+│  q          quit                                                             │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+ press any key to close help

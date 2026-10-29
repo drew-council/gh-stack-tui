@@ -76,7 +76,8 @@ func TestRenderWide(t *testing.T) {
 	assertScreen(t, press(demoModel(t, 120, 40), "f", "C"))
 }
 
-// TestRenderScrolled is too short for the whole stack.
+// TestRenderScrolled is too short for the stack, so the panel says how much
+// is above and below.
 func TestRenderScrolled(t *testing.T) {
 	assertScreen(t, press(demoModel(t, 80, 20), "f", "l", "j", "j", "j"))
 }

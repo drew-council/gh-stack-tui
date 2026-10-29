@@ -360,25 +360,29 @@ func (m *Model) click(x, y int) tea.Cmd {
 	if y < m.bodyTop() || line < 0 {
 		return nil
 	}
+	col := x - 1 // the panel's left border
 	for i, r := range m.rows {
 		if line < r.y || line >= r.y+r.height {
 			continue
 		}
 		switch {
-		case r.kind == rowSection:
+		case r.kind == rowSections:
 			if m.navigable(m.branchRow(r.branch)) {
 				m.setCursor(m.branchRow(r.branch))
 			}
-			m.expanded[r.key] = !m.expanded[r.key]
-			m.rebuild()
+			if sec := m.sectionAt(r.branch, col); sec != "" {
+				m.toggleSection(sec)
+			}
 		case r.kind == rowWorkflow || r.kind == rowGenerated:
 			m.setCursor(i)
 			m.expanded[r.key] = !m.expanded[r.key]
 			m.rebuild()
 		case m.navigable(i):
 			m.setCursor(i)
-			// The PR number sits right after the bullet and status icon.
-			if r.kind == rowBranch && r.height >= 2 && line == r.y && x >= 2 && x < 12 {
+			// The PR number starts the branch's second line.
+			num := m.prNumber(r.branch)
+			if r.kind == rowBranch && num != 0 && line == r.y+1 &&
+				col < colContent+len(fmt.Sprintf("#%d", num)) {
 				if url := m.prURL(r.branch); url != "" {
 					return openBrowser(url)
 				}

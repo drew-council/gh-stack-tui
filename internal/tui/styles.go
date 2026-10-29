@@ -1,7 +1,9 @@
 package tui
 
 import (
+	"fmt"
 	"image/color"
+	"strings"
 
 	"charm.land/lipgloss/v2"
 	catppuccin "github.com/catppuccin/go"
@@ -10,41 +12,33 @@ import (
 )
 
 // styles is the palette and the styles built from it. Colors come from
-// Catppuccin Mocha, so the TUI matches other Catppuccin-themed tools; the
-// layout and the role of each color follow gh stack view.
+// Catppuccin Mocha, so the TUI matches other Catppuccin-themed tools. Color
+// marks state that needs attention; everything else is primary or muted ink.
 type styles struct {
-	text, muted, border, accent color.Color
-	green, gray, yellow, peach  color.Color
-	mauve, red, teal, onFill    color.Color
+	text, muted, faint, border, accent color.Color
+	green, yellow, peach, mauve        color.Color
+	red, teal, onFill, cursorBg        color.Color
 
 	normal lipgloss.Style // primary ink
 	dim    lipgloss.Style // secondary ink: labels, hints, timestamps
+	faintS lipgloss.Style // tertiary ink: counts of collapsed sections
 
 	// Tree
-	conn        lipgloss.Style // connector lines and bullets
-	connDashed  lipgloss.Style // needs-rebase connector
-	connFocus   lipgloss.Style // connector of the hovered branch
-	connCurrent lipgloss.Style // hovered branch that is checked out
-	connMerged  lipgloss.Style
-	connQueued  lipgloss.Style
+	conn       lipgloss.Style // connector lines
+	connDashed lipgloss.Style // needs-rebase connector
+	connActive lipgloss.Style // connector of the hovered branch
+	cursor     lipgloss.Style // cursor bar in the gutter
 
 	branch        lipgloss.Style
 	branchCurrent lipgloss.Style
 	branchMerged  lipgloss.Style
 	trunk         lipgloss.Style
+	prNum         lipgloss.Style
 
-	// PR state
-	prLink   lipgloss.Style
-	prOpen   lipgloss.Style
-	prMerged lipgloss.Style
-	prClosed lipgloss.Style
-	prDraft  lipgloss.Style
-	prQueued lipgloss.Style
-
-	iconOpen   lipgloss.Style
-	iconMerged lipgloss.Style
-	iconQueued lipgloss.Style
-	iconWarn   lipgloss.Style
+	bulletCurrent  lipgloss.Style
+	bulletSelected lipgloss.Style
+	bulletMerged   lipgloss.Style
+	bulletQueued   lipgloss.Style
 
 	add lipgloss.Style
 	del lipgloss.Style
@@ -54,8 +48,9 @@ type styles struct {
 	warn lipgloss.Style
 	err  lipgloss.Style
 	bot  lipgloss.Style // comments from bots such as Copilot
+	info lipgloss.Style // merged and other settled states
 
-	selected lipgloss.Style // review-selection pill
+	selected lipgloss.Style // pill for the selection mode
 	match    lipgloss.Style // fuzzy-matched characters
 
 	// Chrome
@@ -72,47 +67,41 @@ func newStyles() styles {
 	f := catppuccin.Mocha
 	c := func(col catppuccin.Color) color.Color { return lipgloss.Color(col.Hex) }
 	s := styles{
-		text:   c(f.Text()),
-		muted:  c(f.Subtext0()),
-		border: c(f.Surface2()),
-		accent: c(f.Blue()),
-		green:  c(f.Green()),
-		gray:   c(f.Overlay1()),
-		yellow: c(f.Yellow()),
-		peach:  c(f.Peach()),
-		mauve:  c(f.Mauve()),
-		red:    c(f.Red()),
-		teal:   c(f.Teal()),
-		onFill: c(f.Base()),
+		text:     c(f.Text()),
+		muted:    c(f.Subtext0()),
+		faint:    c(f.Overlay1()),
+		border:   c(f.Surface2()),
+		accent:   c(f.Blue()),
+		green:    c(f.Green()),
+		yellow:   c(f.Yellow()),
+		peach:    c(f.Peach()),
+		mauve:    c(f.Mauve()),
+		red:      c(f.Red()),
+		teal:     c(f.Teal()),
+		onFill:   c(f.Base()),
+		cursorBg: c(f.Surface1()),
 	}
 	fg := func(col color.Color) lipgloss.Style { return lipgloss.NewStyle().Foreground(col) }
 
 	s.normal = fg(s.text)
 	s.dim = fg(s.muted)
+	s.faintS = fg(s.faint)
 
 	s.conn = fg(s.border)
 	s.connDashed = fg(s.peach)
-	s.connFocus = fg(s.text)
-	s.connCurrent = fg(s.accent)
-	s.connMerged = fg(s.mauve)
-	s.connQueued = fg(s.peach)
+	s.connActive = fg(s.accent)
+	s.cursor = fg(s.accent)
 
-	s.branch = fg(s.text)
+	s.branch = fg(s.text).Bold(true)
 	s.branchCurrent = fg(s.accent).Bold(true)
 	s.branchMerged = fg(s.muted)
 	s.trunk = fg(s.muted).Italic(true)
+	s.prNum = fg(s.faint)
 
-	s.prLink = fg(s.text).Underline(true)
-	s.prOpen = fg(s.green)
-	s.prMerged = fg(s.mauve)
-	s.prClosed = fg(s.red)
-	s.prDraft = fg(s.gray)
-	s.prQueued = fg(s.peach)
-
-	s.iconOpen = fg(s.green)
-	s.iconMerged = fg(s.mauve)
-	s.iconQueued = fg(s.peach)
-	s.iconWarn = fg(s.peach)
+	s.bulletCurrent = fg(s.accent)
+	s.bulletSelected = fg(s.green)
+	s.bulletMerged = fg(s.mauve)
+	s.bulletQueued = fg(s.peach)
 
 	s.add = fg(s.green)
 	s.del = fg(s.red)
@@ -122,6 +111,7 @@ func newStyles() styles {
 	s.warn = fg(s.peach)
 	s.err = fg(s.red)
 	s.bot = fg(s.teal)
+	s.info = fg(s.mauve)
 
 	s.selected = lipgloss.NewStyle().
 		Foreground(s.onFill).
@@ -132,7 +122,7 @@ func newStyles() styles {
 	s.match = fg(s.accent).Bold(true)
 
 	s.title = fg(s.text).Bold(true)
-	s.key = fg(s.text)
+	s.key = fg(s.accent)
 	s.keyDesc = fg(s.muted)
 	s.rule = fg(s.border)
 	s.prompt = fg(s.accent)
@@ -141,16 +131,25 @@ func newStyles() styles {
 	return s
 }
 
-// Glyphs follow gh stack view.
+// highlight paints line's background in the cursor color. Styled segments
+// end in a full reset, so the background is set again after each one.
+func (s styles) highlight(line string) string {
+	r, g, b, _ := s.cursorBg.RGBA()
+	bg := fmt.Sprintf("\x1b[48;2;%d;%d;%dm", r>>8, g>>8, b>>8)
+	line = strings.ReplaceAll(line, "\x1b[0m", "\x1b[m")
+	return bg + strings.ReplaceAll(line, "\x1b[m", "\x1b[m"+bg) + "\x1b[m"
+}
+
 const (
-	glyphOpen      = "○"
+	glyphBranch    = "○"
+	glyphCurrent   = "●"
+	glyphSelected  = "◆"
 	glyphMerged    = "✓"
 	glyphQueued    = "◎"
-	glyphWarn      = "⚠"
 	glyphCollapsed = "▸"
 	glyphExpanded  = "▾"
-	glyphFocus     = "▶"
-	glyphBullet    = "├"
+	glyphCursor    = "▌"
+	glyphActive    = "▏"
 	glyphTrunk     = "└"
 	glyphConn      = "│"
 	glyphDashed    = "┊"

@@ -9,7 +9,9 @@ type rowKind int
 
 const (
 	rowBranch rowKind = iota
-	rowSection
+	// rowSections lists a branch's files, commits, and checks on one line.
+	// Open sections show their items under it.
+	rowSections
 	rowFile
 	rowGenerated
 	rowCommit
@@ -20,6 +22,7 @@ const (
 	rowTrunk
 )
 
+// Sections in the order they show under a branch.
 const (
 	secFiles   = "files"
 	secCommits = "commits"
@@ -91,115 +94,80 @@ func (m *Model) buildRows() {
 		}
 		prevMerged = merged
 
-		// Like gh stack view, a branch with a PR takes two lines: the PR
-		// line on top, then the branch line. Review status adds a third.
-		height := 1
-		if m.prNumber(i) != 0 {
-			height = 2
-			if m.reviewLine(i) != "" {
-				height = 3
-			}
+		add(row{
+			kind:   rowBranch,
+			key:    branchKey(b.Name),
+			branch: i,
+			height: len(m.branchParts(i)),
+		})
+		if len(m.sectionSegments(i)) > 0 {
+			add(row{kind: rowSections, key: "sections\x00" + b.Name, branch: i})
 		}
-		add(row{kind: rowBranch, key: branchKey(b.Name), branch: i, height: height})
 
-		if len(b.Files) > 0 {
-			add(
-				row{
-					kind:    rowSection,
-					key:     sectionKey(b.Name, secFiles),
-					branch:  i,
-					section: secFiles,
-				},
-			)
-			if m.expanded[sectionKey(b.Name, secFiles)] {
-				gen := 0
-				for fi := range b.Files {
-					f := &b.Files[fi]
-					if f.Generated {
-						gen++
-						continue
-					}
-					add(
-						row{
+		if m.expanded[sectionKey(b.Name, secFiles)] {
+			gen := 0
+			for fi := range b.Files {
+				f := &b.Files[fi]
+				if f.Generated {
+					gen++
+					continue
+				}
+				add(
+					row{
+						kind:   rowFile,
+						key:    "file\x00" + b.Name + "\x00" + f.Path,
+						branch: i,
+						file:   f,
+					},
+				)
+			}
+			if gen > 0 {
+				gk := generatedKey(b.Name)
+				add(row{kind: rowGenerated, key: gk, branch: i, count: gen})
+				if m.expanded[gk] {
+					for fi := range b.Files {
+						f := &b.Files[fi]
+						if !f.Generated {
+							continue
+						}
+						add(row{
 							kind:   rowFile,
 							key:    "file\x00" + b.Name + "\x00" + f.Path,
 							branch: i,
 							file:   f,
-						},
-					)
-				}
-				if gen > 0 {
-					gk := generatedKey(b.Name)
-					add(row{kind: rowGenerated, key: gk, branch: i, count: gen})
-					if m.expanded[gk] {
-						for fi := range b.Files {
-							f := &b.Files[fi]
-							if !f.Generated {
-								continue
-							}
-							add(
-								row{
-									kind:   rowFile,
-									key:    "file\x00" + b.Name + "\x00" + f.Path,
-									branch: i,
-									file:   f,
-								},
-							)
-						}
+						})
 					}
 				}
 			}
 		}
-		if len(b.Commits) > 0 {
-			add(
-				row{
-					kind:    rowSection,
-					key:     sectionKey(b.Name, secCommits),
-					branch:  i,
-					section: secCommits,
-				},
-			)
-			if m.expanded[sectionKey(b.Name, secCommits)] {
-				for ci := range b.Commits {
-					c := &b.Commits[ci]
-					add(
-						row{
-							kind:   rowCommit,
-							key:    "commit\x00" + b.Name + "\x00" + c.SHA,
-							branch: i,
-							commit: c,
-						},
-					)
-				}
+		if m.expanded[sectionKey(b.Name, secCommits)] {
+			for ci := range b.Commits {
+				c := &b.Commits[ci]
+				add(
+					row{
+						kind:   rowCommit,
+						key:    "commit\x00" + b.Name + "\x00" + c.SHA,
+						branch: i,
+						commit: c,
+					},
+				)
 			}
 		}
-		if pr := m.prFor(i); pr != nil && len(pr.Checks.Workflows) > 0 {
-			add(
-				row{
-					kind:    rowSection,
-					key:     sectionKey(b.Name, secChecks),
-					branch:  i,
-					section: secChecks,
-				},
-			)
-			if m.expanded[sectionKey(b.Name, secChecks)] {
-				for wi := range pr.Checks.Workflows {
-					w := &pr.Checks.Workflows[wi]
-					wk := workflowKey(b.Name, w.Name)
-					add(row{kind: rowWorkflow, key: wk, branch: i, workflow: w})
-					if m.expanded[wk] {
-						for ci := range w.Checks {
-							c := &w.Checks[ci]
-							add(
-								row{
-									kind:     rowCheck,
-									key:      wk + "\x00" + c.Name,
-									branch:   i,
-									workflow: w,
-									check:    c,
-								},
-							)
-						}
+		if pr := m.prFor(i); pr != nil && m.expanded[sectionKey(b.Name, secChecks)] {
+			for wi := range pr.Checks.Workflows {
+				w := &pr.Checks.Workflows[wi]
+				wk := workflowKey(b.Name, w.Name)
+				add(row{kind: rowWorkflow, key: wk, branch: i, workflow: w})
+				if m.expanded[wk] {
+					for ci := range w.Checks {
+						c := &w.Checks[ci]
+						add(row{
+							kind:     rowCheck,
+							key:      wk + "\x00" + c.Name,
+							branch:   i,
+							workflow: w,
+							check:    c,
+						})
 					}
 				}
 			}

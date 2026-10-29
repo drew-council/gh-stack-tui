@@ -8,7 +8,7 @@ It covers what `gh stack view` shows, and adds:
 - **CI checks per PR**, grouped by workflow. Each workflow expands to its jobs, and re-runs are deduplicated.
 - **Stack operations without leaving the TUI:** push, sync, rebase, submit, merge, add, and unstack. Output streams into a panel under the stack. Commands started while one is running queue up and run in order; a failure or `ctrl+c` drops the rest. `gh stack modify` runs in the foreground and the TUI comes back when it exits.
 - **Vim-style keys throughout.** Arrow keys also work.
-- **Catppuccin Mocha** colors, laid out like `gh stack view`.
+- **Catppuccin Mocha** colors, with the stack drawn as a tree like `gh stack view`.
 - **Copying** the hovered file path, commit SHA, branch name, or URL.
 - **Review:** select layers of the stack and open their combined commit range in [tuicr](https://github.com/agavra/tuicr), or a single layer's PR, in a new herdr tab, a new tmux window, or inline.
 
@@ -23,6 +23,20 @@ go run . [-C dir] [--stack N] [--interval 30s] [--poll 2s] [--review-cmd 'tuicr 
 The TUI shows the stack containing the checked out branch and follows you when you check out a branch in another stack. On trunk, or with a detached HEAD mid-rebase, it keeps showing the last stack. `[` and `]` switch between stacks and pin the choice until you next check out a branch.
 
 Stack operations run `gh stack` against the checked out stack. When you are viewing a different stack, press `c` on one of its branches first.
+
+## Reading the stack
+
+Each branch is a block on the tree, top of the stack first. The left column reads like a sentence: the branch, then its PR number and title, then what needs attention, such as a rebase, conflicts, or unresolved threads. The right column holds state: the diff, where the PR stands with review, and CI. The last line lists the branch's files, commits, and checks; `f`, `C`, and `x` open them under it.
+
+| Mark | Meaning |
+|---|---|
+| `●` `○` | checked out branch, other branch |
+| `◆` | selected for review |
+| `◎` `✓` | in the merge queue, merged |
+| `┊` | needs a rebase onto its parent |
+| `▏` `▌` | the hovered branch, the row under the cursor |
+
+`?` shows these marks too.
 
 ## Keys
 

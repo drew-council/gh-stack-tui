@@ -140,8 +140,8 @@ func TestRowsTopFirstWithMergedSeparator(t *testing.T) {
 	}
 	want := []rowKind{
 		rowBranch, rowSpacer, // four
-		rowBranch, rowSection, rowSpacer, // three: files
-		rowBranch, rowSection, rowSection, rowSection, rowSpacer, // two: files, commits, checks
+		rowBranch, rowSections, rowSpacer, // three: files
+		rowBranch, rowSections, rowSpacer, // two: files, commits, checks
 		rowSeparator, rowBranch, rowSpacer, // one (merged)
 		rowTrunk,
 	}
@@ -301,21 +301,21 @@ func TestReviewSingleBranchWithPR(t *testing.T) {
 
 func TestHeaderNotesGetTheirOwnLine(t *testing.T) {
 	m := testModel()
-	if n := len(m.headerLines()); n != 2 {
-		t.Fatalf("plain header should be the title and a blank line, got %d lines", n)
+	if n := len(m.headerLines()); n != 0 {
+		t.Fatalf("plain header should be empty, got %d lines", n)
 	}
 	m.snap.Rebasing, m.snap.Dirty = true, true
 	lines := m.headerLines()
-	if len(lines) != 3 {
-		t.Fatalf("header with notes should add one line, got %d", len(lines))
+	if len(lines) != 1 {
+		t.Fatalf("header with notes should be one line, got %d", len(lines))
 	}
-	if got := ansi.Strip(
-		lines[1],
-	); got != "rebase in progress  rc continue · ra abort · uncommitted changes" {
+	if got := strings.TrimSpace(ansi.Strip(
+		lines[0],
+	)); got != "rebase in progress  rc continue · ra abort · uncommitted changes" {
 		t.Fatalf("notes line = %q", got)
 	}
-	if strings.Contains(ansi.Strip(lines[0]), "rebase") {
-		t.Fatal("title line should not carry the rebase note")
+	if title, _ := m.stackTitle(); strings.Contains(ansi.Strip(title), "rebase") {
+		t.Fatal("panel title should not carry the rebase note")
 	}
 }
 
@@ -488,14 +488,14 @@ func TestCachedPRsShowUntilGitHubAnswers(t *testing.T) {
 		at:    at,
 	})
 	m = next.(Model)
-	header := ansi.Strip(strings.Join(m.headerLines(), "\n"))
+	header := ansi.Strip(m.render())
 	if m.prs["two"].Title != "Cached title" || !strings.Contains(header, "cached 5m ago") {
 		t.Fatalf("cached PRs should show, header %q", header)
 	}
 
 	next, _ = m.Update(remoteLoadedMsg{prs: live, at: testNow})
 	m = next.(Model)
-	header = ansi.Strip(strings.Join(m.headerLines(), "\n"))
+	header = ansi.Strip(m.render())
 	if m.prs["two"].Title != "Second layer" || strings.Contains(header, "cached") {
 		t.Fatalf("GitHub's answer should replace the cache, header %q", header)
 	}
