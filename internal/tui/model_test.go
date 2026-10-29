@@ -2,6 +2,7 @@ package tui
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -205,6 +206,29 @@ func TestCursorSurvivesReload(t *testing.T) {
 	m.restoreCursor("")
 	if after := hovered(t, m); after.key != before.key {
 		t.Fatalf("cursor moved from %q to %q", before.key, after.key)
+	}
+}
+
+func TestSelectionHelpersUseStackOrderAndDedupe(t *testing.T) {
+	m := testModel()
+	m.snap.Branches[2].Files = []git.FileChange{{Path: "a.go"}, {Path: "c.go"}}
+	m = press(m, "space", "K", "space")
+
+	if got := m.selectedBranches(); !slices.Equal(got, []int{1, 2}) {
+		t.Fatalf("selected branches = %v, want [1 2]", got)
+	}
+	if got := strings.Join(m.selectedBranchNames(), "\n"); got != "two\nthree" {
+		t.Fatalf("selected names = %q", got)
+	}
+	if got := strings.Join(m.selectedFilePaths(), "\n"); got != "a.go\nb.go\nc.go" {
+		t.Fatalf("selected file paths = %q", got)
+	}
+
+	// With nothing selected, the helpers stay empty so commands fall back to
+	// the hovered branch or item.
+	m = testModel()
+	if got := m.selectedBranches(); len(got) != 0 {
+		t.Fatalf("selected branches without a selection = %v", got)
 	}
 }
 

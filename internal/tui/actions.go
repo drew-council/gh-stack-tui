@@ -368,21 +368,57 @@ func fileAnchor(path string) string {
 
 // --- review ---
 
-// reviewSelection returns the branch indexes (bottom first) to review: the
-// visual range, else the marked branches, else the hovered branch.
-func (m *Model) reviewSelection() []int {
+// selectedBranches returns the branch indexes (bottom first) in the review
+// selection, or nil when nothing is marked or in the visual range.
+func (m *Model) selectedBranches() []int {
+	if !m.visual && len(m.marks) == 0 {
+		return nil
+	}
 	var sel []int
 	for i, b := range m.snap.Branches {
 		if m.isSelected(i, b.Name) {
 			sel = append(sel, i)
 		}
 	}
-	if len(sel) == 0 {
-		if bi := m.hoveredBranch(); bi >= 0 {
-			sel = []int{bi}
+	return sel
+}
+
+// selectedBranchNames returns the names of the selected branches in stack
+// order, for copying one per line.
+func (m *Model) selectedBranchNames() []string {
+	var names []string
+	for _, i := range m.selectedBranches() {
+		names = append(names, m.snap.Branches[i].Name)
+	}
+	return names
+}
+
+// selectedFilePaths returns the changed file paths across the selected
+// branches, in branch order and without duplicates.
+func (m *Model) selectedFilePaths() []string {
+	var paths []string
+	seen := map[string]bool{}
+	for _, i := range m.selectedBranches() {
+		for _, f := range m.snap.Branches[i].Files {
+			if !seen[f.Path] {
+				seen[f.Path] = true
+				paths = append(paths, f.Path)
+			}
 		}
 	}
-	return sel
+	return paths
+}
+
+// reviewSelection returns the branch indexes (bottom first) to review: the
+// visual range, else the marked branches, else the hovered branch.
+func (m *Model) reviewSelection() []int {
+	if sel := m.selectedBranches(); len(sel) > 0 {
+		return sel
+	}
+	if bi := m.hoveredBranch(); bi >= 0 {
+		return []int{bi}
+	}
+	return nil
 }
 
 // isSelected reports whether branch i is marked or inside the visual range.

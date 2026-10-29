@@ -51,10 +51,10 @@ var helpSections = []helpSection{
 		{"x", "CI checks"},
 		{"z / Z", "toggle branch / collapse all"},
 	}},
-	{"hovered item", [][2]string{
+	{"branch or item", [][2]string{
 		{"o", "open in browser"},
-		{"y", "copy name / path / sha / url"},
-		{"Y", "copy all file paths"},
+		{"y", "copy name(s) / path / sha / url"},
+		{"Y", "copy changed file paths"},
 		{"e", "edit file in $EDITOR"},
 		{"c", "checkout branch"},
 		{"M", "merge PR (and below)"},
@@ -538,6 +538,15 @@ func (m *Model) openHovered() tea.Cmd {
 }
 
 func (m *Model) yankHovered() tea.Cmd {
+	if names := m.selectedBranchNames(); len(names) > 0 {
+		if len(names) == 1 {
+			return copyToClipboard(names[0], names[0])
+		}
+		return copyToClipboard(
+			strings.Join(names, "\n"),
+			fmt.Sprintf("%d branch names", len(names)),
+		)
+	}
 	r, ok := m.hovered()
 	if !ok || r.branch < 0 {
 		return nil
@@ -559,6 +568,16 @@ func (m *Model) yankHovered() tea.Cmd {
 }
 
 func (m *Model) yankFiles() tea.Cmd {
+	if len(m.selectedBranches()) > 0 {
+		paths := m.selectedFilePaths()
+		if len(paths) == 0 {
+			return m.setFlash("no files changed in the selection", true)
+		}
+		return copyToClipboard(
+			strings.Join(paths, "\n"),
+			fmt.Sprintf("%d file paths", len(paths)),
+		)
+	}
 	r, ok := m.hovered()
 	if !ok || r.branch < 0 {
 		return nil
