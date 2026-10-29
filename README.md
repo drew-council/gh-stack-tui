@@ -15,7 +15,7 @@ It covers what `gh stack view` shows, and adds:
 ## Usage
 
 ```sh
-go run . [-C dir] [-stack N] [-interval 30s] [-poll 2s] [-review-cmd 'tuicr -r {range}'] [-review-pr-cmd 'tuicr pr {pr}'] [-review-in auto]
+go run . [-C dir] [--stack N] [--interval 30s] [--poll 2s] [--review-cmd 'tuicr -r {range}'] [--review-pr-cmd 'tuicr pr {pr}'] [--review-in auto]
 ```
 
 The TUI shows the stack containing the checked out branch and follows you when you check out a branch in another stack. On trunk, or with a detached HEAD mid-rebase, it keeps showing the last stack. `[` and `]` switch between stacks and pin the choice until you next check out a branch.

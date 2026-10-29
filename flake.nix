@@ -50,7 +50,7 @@
             version = "0.1.0";
             src = ./.;
             nativeBuildInputs = [ pkgs.git ];
-            vendorHash = "sha256-D6BKRpQZIfhRrepZDs6bpQmzr7maG0/ahh+pEkNo+Pc=";
+            vendorHash = "sha256-6iZbI1DjuOHNs8lkVPqEJjVEDaLuCc9jSZClvNgkTzE=";
             # The gh-stack shim is its own module; see third_party/gh-stack.
             excludedPackages = [ "third_party" ];
             postInstall = ''

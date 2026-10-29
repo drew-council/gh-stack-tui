@@ -12,6 +12,7 @@ require (
 	github.com/github/gh-stack/shim/ghstack v0.0.0-00010101000000-000000000000
 	github.com/mattn/go-sqlite3 v1.14.52
 	github.com/sebdah/goldie/v2 v2.8.0
+	github.com/spf13/cobra v1.10.2
 )
 
 require (
@@ -28,6 +29,7 @@ require (
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/github/gh-stack v0.2.1 // indirect
 	github.com/henvic/httpretty v0.2.0 // indirect
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.1 // indirect
 	github.com/mattn/go-isatty v0.0.22 // indirect
@@ -38,6 +40,7 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/sergi/go-diff v1.0.0 // indirect
+	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/thlib/go-timezone-local v0.0.8 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/sync v0.22.0 // indirect
