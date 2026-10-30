@@ -26,7 +26,7 @@ Stack operations run `gh stack` against the checked out stack. When you are view
 
 ## Reading the stack
 
-Each branch is a block on the tree, top of the stack first. The left column reads like a sentence: the branch, then its PR number and title, then what needs attention, such as a rebase, conflicts, or unresolved threads. The right column holds state: the diff, where the PR stands with review, and CI. Under them are the branch's files, commits, and checks, each of which opens on its own.
+Each branch is a block on the tree, top of the stack first. The left column reads like a sentence: the branch, then its PR number, state, and title, then the branch's own state, such as a rebase or conflicts, followed by where review stands, such as the review decision and unresolved threads. The right column holds CI, then the diff. Every branch that has not merged takes three lines, however long its title. Under them are the branch's files, commits, and checks, each of which opens on its own.
 
 The hovered branch is shaded whole, down to the gap under it. When the cursor is on one of its items, that row is shaded brighter. Mauve means selected for review and nothing else: selected branches are tinted mauve, the one under the cursor brighter, and the stack's border turns mauve in visual mode. Blue marks the checked out branch, and peach anything that needs attention.
 

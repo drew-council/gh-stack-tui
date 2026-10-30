@@ -17,7 +17,7 @@ import (
 type styles struct {
 	text, muted, faint, border, accent color.Color
 	green, yellow, peach, mauve        color.Color
-	red, teal, onFill                  color.Color
+	red, teal, draft, onFill           color.Color
 
 	// Backgrounds. See rowBg for when each is used.
 	blockBg, cursorBg, selBg, selCursorBg color.Color
@@ -36,6 +36,9 @@ type styles struct {
 	branchMerged  lipgloss.Style
 	trunk         lipgloss.Style
 	prNum         lipgloss.Style
+
+	// PR state labels: OPEN, DRAFT, QUEUED, CLOSED.
+	prOpen, prDraft, prQueued, prClosed lipgloss.Style
 
 	bulletCurrent lipgloss.Style
 	bulletMerged  lipgloss.Style
@@ -81,6 +84,7 @@ func newStyles() styles {
 		mauve:    c(f.Mauve()),
 		red:      c(f.Red()),
 		teal:     c(f.Teal()),
+		draft:    c(f.Overlay2()),
 		onFill:   c(f.Base()),
 		cursorBg: c(f.Surface1()),
 	}
@@ -102,6 +106,14 @@ func newStyles() styles {
 	s.branchMerged = fg(s.muted)
 	s.trunk = fg(s.muted).Italic(true)
 	s.prNum = fg(s.faint)
+
+	pill := func(bg color.Color) lipgloss.Style {
+		return lipgloss.NewStyle().Foreground(s.onFill).Background(bg).Bold(true).Padding(0, 1)
+	}
+	s.prOpen = pill(s.green)
+	s.prDraft = pill(s.draft)
+	s.prQueued = pill(s.peach)
+	s.prClosed = pill(s.red)
 
 	s.bulletCurrent = fg(s.accent)
 	s.selection = fg(s.mauve)

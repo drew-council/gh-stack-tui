@@ -517,9 +517,10 @@ func (m Model) renderBranch(r row, active bool) []string {
 }
 
 // branchParts lays out the lines of branch bi's header. The left column
-// reads like a sentence: the branch, then its PR and title, then anything
-// that needs attention. The right column holds the state: the diff, where
-// the PR stands with review, and CI. A merged branch takes one line.
+// reads like a sentence: the branch, then its PR with its state and title,
+// then the branch's own state and where review stands. The right
+// column holds CI, then the diff. A merged branch takes one line and any other
+// branch three, however long its text, so headers never wrap.
 func (m Model) branchParts(bi int) []parts {
 	s := m.st
 	b := m.snap.Branches[bi]
@@ -548,36 +549,31 @@ func (m Model) branchParts(bi int) []parts {
 	case b.Additions > 0 || b.Deletions > 0:
 		diff = m.diffStat(b.Additions, b.Deletions)
 	}
-	out := []parts{{name, diff}}
 
+	var title string
 	if num != 0 {
-		left := s.prNum.Render(fmt.Sprintf("#%d", num))
+		title = s.prNum.Render(fmt.Sprintf("#%d", num)) + " "
+	}
+	switch label := m.prLabel(bi); {
+	case label != "":
+		title += label
 		if pr != nil && pr.Title != "" {
-			left += " " + s.normal.Render(pr.Title)
+			title += " " + s.normal.Render(pr.Title)
 		}
-		out = append(out, parts{left, m.prState(bi)})
+	case num == 0:
+		title = s.faintS.Render("no pull request")
 	}
-	if notes, ci := m.attention(bi), m.ciState(bi); notes != "" || ci != "" {
-		out = append(out, parts{notes, ci})
+
+	return []parts{
+		{name, m.ciState(bi)},
+		{title, diff},
+		{m.attention(bi), ""},
 	}
-	// A value that does not fit beside its line takes its own line, so
-	// neither is cut.
-	room := m.innerWidth() - colContent - 1
-	var fitted []parts
-	for i, p := range out {
-		if i > 0 && p.left != "" && p.right != "" &&
-			lipgloss.Width(p.left)+2+lipgloss.Width(p.right) > room {
-			fitted = append(fitted, parts{p.left, ""}, parts{"", p.right})
-			continue
-		}
-		fitted = append(fitted, p)
-	}
-	return fitted
 }
 
-// prState is where branch bi's PR stands: queued, closed, draft, or for an
-// open PR, its review decision. A PR still loading shows the spinner.
-func (m Model) prState(bi int) string {
+// prLabel is the state of branch bi's PR as a colored word: OPEN, DRAFT,
+// QUEUED, or CLOSED. A PR still loading shows the spinner.
+func (m Model) prLabel(bi int) string {
 	s := m.st
 	pr := m.prFor(bi)
 	if pr == nil {
@@ -587,14 +583,23 @@ func (m Model) prState(bi int) string {
 		return ""
 	}
 	switch {
-	case pr.Merged:
-		return s.dim.Render("merged")
 	case pr.Queued:
-		return s.warn.Render("queued")
+		return s.prQueued.Render("QUEUED")
 	case pr.State == "CLOSED":
-		return s.err.Render("closed")
+		return s.prClosed.Render("CLOSED")
 	case pr.IsDraft:
-		return s.dim.Render("draft")
+		return s.prDraft.Render("DRAFT")
+	}
+	return s.prOpen.Render("OPEN")
+}
+
+// review is the review decision on branch bi's PR, when it is open and
+// ready for review.
+func (m Model) review(bi int) string {
+	s := m.st
+	pr := m.prFor(bi)
+	if pr == nil || pr.State != "OPEN" || pr.IsDraft {
+		return ""
 	}
 	switch pr.Review() {
 	case github.ReviewApproved:
@@ -605,8 +610,9 @@ func (m Model) prState(bi int) string {
 	return s.dim.Render("in review")
 }
 
-// attention lists what needs doing on branch bi: a rebase, merge conflicts,
-// and open review threads.
+// attention is the state of branch bi, then where its review stands: a
+// rebase or merge conflicts first, then the review decision and open review
+// threads.
 func (m Model) attention(bi int) string {
 	s := m.st
 	b := m.snap.Branches[bi]
@@ -623,6 +629,9 @@ func (m Model) attention(bi int) string {
 			case "BEHIND":
 				notes = append(notes, s.warn.Render("behind base"))
 			}
+		}
+		if review := m.review(bi); review != "" {
+			notes = append(notes, review)
 		}
 		if pr.Unresolved > 0 {
 			notes = append(notes, s.warn.Render(fmt.Sprintf("%d unresolved", pr.Unresolved)))

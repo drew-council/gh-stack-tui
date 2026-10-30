@@ -1,30 +1,30 @@
  ╭─ #7 on main · 1/2 ─────────────────────── ↻ 12s ago ─╮
- │ ○ auth/audit-log                             +106 -2 │
- │ ┊ #106 Write an audit log entry for each login       │
- │ ┊                                              draft │
- │ ┊ needs rebase                           ● 2 running │
+ │ │                                                    │
+ │ │ ▸ 1 file                                           │
+ │ │ ▸ 1 commit                                         │
+ │ │                                                    │
+ │ ○ auth/audit-log                         ● 2 running │
+ │ ┊ #106  DRAFT  Write an audit log entry fo…  +106 -2 │
+ │ ┊ needs rebase                                       │
  │ ┊ ▸ 2 files                                          │
  │ ┊ ▸ 1 commit                                         │
  │ ┊ ▸ 3 checks                                         │
  │ ┊                                                    │
- │ ● auth/rate-limit                           +394 -83 │
- │ │ #105 Rate limit login attempts per account         │
- │ │                                  changes requested │
- │ │ conflicts · 3 unresolved · 1 bot                   │
- │ │                            ✗ 2 failing ● 1 running │
+ │ ● auth/rate-limit            ✗ 2 failing ● 1 running │
+ │ │ #105  OPEN  Rate limit login attempts p…  +394 -83 │
+ │ │ conflicts · changes requested · 3 unresolved · 1 … │
  │ │ ▸ 5 files + 1 generated                            │
  │ │ ▸ 4 commits                                        │
  │ │ ▸ 6 checks                                         │
  │ │                                                    │
-█│ ○ auth/middleware                            +242 -6 │
-█│ │ #104 Require a session on every API route          │
-█│ │                                           approved │
-█│ │ 1 unresolved                             ✓ passing │
+█│ ○ auth/middleware                          ✓ passing │
+█│ │ #104  OPEN  Require a session on every A…  +242 -6 │
+█│ │ approved · 1 unresolved                            │
 █│ │ ▸ 3 files + 1 generated                            │
 █│ │ ▸ 3 commits                                        │
 █│ │ ▸ 4 checks                                         │
 █│ │                                                    │
- ╰───────────────────────────────────────────── ↑4 ↓12 ─╯
+ ╰───────────────────────────────────────────── ↑2 ↓11 ─╯
   merge #104 and 1 PR below it?
   y last-used method  s squash  m merge commit  r rebase
   n no

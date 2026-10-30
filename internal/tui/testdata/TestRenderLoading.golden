@@ -1,30 +1,30 @@
  ╭─ #7 on main · 1/2 ──────────────────────────────────────────── ⠋ refreshing ─╮
- │ ○ auth/docs                                                           +40 -3 │
+ │ ○ auth/docs                                                                  │
+ │ │ ⠋                                                                   +40 -3 │
+ │ │                                                                            │
  │ │ ▸ 1 file                                                                   │
  │ │ ▸ 1 commit                                                                 │
  │ │                                                                            │
- │ ○ auth/audit-log                                                     +106 -2 │
- │ ┊ #106                                                                     ⠋ │
+ │ ○ auth/audit-log                                                             │
+ │ ┊ #106 ⠋                                                             +106 -2 │
  │ ┊ needs rebase                                                               │
  │ ┊ ▸ 2 files                                                                  │
  │ ┊ ▸ 1 commit                                                                 │
  │ ┊                                                                            │
-░│ ● auth/rate-limit                                                   +394 -83 │
-░│ │ #105                                                                     ⠋ │
+░│ ● auth/rate-limit                                                            │
+░│ │ #105 ⠋                                                            +394 -83 │
+░│ │                                                                            │
 █│ │ ▸ 5 files + 1 generated                                                    │
 ░│ │ ▸ 4 commits                                                                │
 ░│ │                                                                            │
- │ ○ auth/middleware                                                    +242 -6 │
- │ │ #104                                                                     ⠋ │
+ │ ○ auth/middleware                                                            │
+ │ │ #104 ⠋                                                             +242 -6 │
+ │ │                                                                            │
  │ │ ▸ 3 files + 1 generated                                                    │
  │ │ ▸ 3 commits                                                                │
  │ │                                                                            │
- │ ○ auth/token-refresh                                                +184 -12 │
- │ │ #103                                                                     ⠋ │
- │ │ ▸ 2 files                                                                  │
- │ │ ▸ 2 commits                                                                │
+ │ ○ auth/token-refresh                                                         │
+ │ │ #103 ⠋                                                            +184 -12 │
  │ │                                                                            │
- │ ── merged ────────────────────────────────────────────────────────────────── │
- │ ✓ auth/redis-sessions  #102                                           merged │
- ╰───────────────────────────────────────────────────────────────────────── ↓2 ─╯
+ ╰───────────────────────────────────────────────────────────────────────── ↓7 ─╯
   j/k items  l in  h out  o open  y copy  e edit  ? help

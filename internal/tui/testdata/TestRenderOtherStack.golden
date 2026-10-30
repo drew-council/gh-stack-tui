@@ -1,16 +1,16 @@
  ╭─ #8 on main · 2/2 · pinned ────────────────────────────────────── ↻ 12s ago ─╮
- │ ○ billing/webhooks                                           no local branch │
- │ │ #111 Retry failed webhooks with backoff                             closed │
+ │ ○ billing/webhooks                                                           │
+ │ │ #111  CLOSED  Retry failed webhooks with backoff           no local branch │
  │ │                                                                            │
-█│ ○ billing/invoices                                                      +230 │
-█│ │ #110 Generate monthly invoices                                   in review │
-█│ │ behind base                                                      ✓ passing │
+ │ │                                                                            │
+█│ ○ billing/invoices                                                 ✓ passing │
+█│ │ #110  OPEN  Generate monthly invoices                                 +230 │
+█│ │ behind base · in review                                                    │
 █│ │ ▸ 1 file                                                                   │
 █│ │ ▸ 1 commit                                                                 │
 █│ │ ▸ 3 checks                                                                 │
 █│ │                                                                            │
  │ └ main                                                                       │
- │                                                                              │
  │                                                                              │
  │                                                                              │
  │                                                                              │

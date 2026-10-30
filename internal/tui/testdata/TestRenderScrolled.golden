@@ -3,9 +3,9 @@
  │ ┊ ▸ 1 commit                                                                 │
  │ ┊ ▸ 3 checks                                                                 │
  │ ┊                                                                            │
-░│ ● auth/rate-limit                                                   +394 -83 │
-░│ │ #105 Rate limit login attempts per account               changes requested │
-░│ │ conflicts · 3 unresolved · 1 bot                   ✗ 2 failing ● 1 running │
+░│ ● auth/rate-limit                                    ✗ 2 failing ● 1 running │
+░│ │ #105  OPEN  Rate limit login attempts per account                 +394 -83 │
+░│ │ conflicts · changes requested · 3 unresolved · 1 bot                       │
 ░│ │ ▾ 5 files + 1 generated                                                    │
 ░│ │   A internal/ratelimit/limiter.go                                     +156 │
 ░│ │   A internal/ratelimit/limiter_test.go                                +210 │
@@ -16,5 +16,5 @@
 ░│ │ ▸ 4 commits                                                                │
 ░│ │ ▸ 6 checks                                                                 │
 ░│ │                                                                            │
- ╰───────────────────────────────────────────────────────────────────── ↑7 ↓18 ─╯
+ ╰───────────────────────────────────────────────────────────────────── ↑9 ↓18 ─╯
   j/k items  h out  o open  y copy  e edit  ? help

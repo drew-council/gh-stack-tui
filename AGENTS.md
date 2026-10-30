@@ -41,7 +41,7 @@ nix develop -c nu scripts/shot.nu shot cursor
 nix develop -c nu scripts/shot.nu stop
 ```
 
-`shot` writes `tmp/shots/<name>.png`, which can be read as an image, and prints its path. `text` prints the screen as plain text and `resize` changes its size. Keys are tmux key names. freeze has no font fallback, so a glyph the font lacks, such as `↻`, shows as a box in shots but not in a terminal.
+`shot` writes `tmp/shots/<name>.png`, which can be read as an image, and prints its path. `text` prints the screen as plain text and `resize` changes its size. Keys are tmux key names. freeze has no font fallback, so a glyph the font lacks, such as `↻`, shows as a box in shots but not in a terminal. freeze also draws background colors a little off, so padding around a filled label can look uneven in shots. Check the escape codes before fixing spacing seen only in a shot.
 
 People can run `go run . demo` themselves.
 

@@ -1,32 +1,34 @@
  ╭─ #7 on main · 1/2 ─────────────────────────────────────────────── ↻ 12s ago ─╮
- │ ○ auth/docs                                                           +40 -3 │
+ │ ○ auth/docs                                                                  │
+ │ │ no pull request                                                     +40 -3 │
+ │ │                                                                            │
  │ │ ▸ 1 file                                                                   │
  │ │ ▸ 1 commit                                                                 │
  │ │                                                                            │
-▒│ ◇ auth/audit-log                                                     +106 -2 │
-▒│ ┊ #106 Write an audit log entry for each login                         draft │
-▒│ ┊ needs rebase                                                   ● 2 running │
+▒│ ◇ auth/audit-log                                                 ● 2 running │
+▒│ ┊ #106  DRAFT  Write an audit log entry for each login               +106 -2 │
+▒│ ┊ needs rebase                                                               │
 ▒│ ┊ ▸ 2 files                                                                  │
 ▒│ ┊ ▸ 1 commit                                                                 │
 ▒│ ┊ ▸ 3 checks                                                                 │
 ▒│ ┊                                                                            │
-▒│ ◆ auth/rate-limit                                                   +394 -83 │
-▒│ │ #105 Rate limit login attempts per account               changes requested │
-▒│ │ conflicts · 3 unresolved · 1 bot                   ✗ 2 failing ● 1 running │
+▒│ ◆ auth/rate-limit                                    ✗ 2 failing ● 1 running │
+▒│ │ #105  OPEN  Rate limit login attempts per account                 +394 -83 │
+▒│ │ conflicts · changes requested · 3 unresolved · 1 bot                       │
 ▒│ │ ▸ 5 files + 1 generated                                                    │
 ▒│ │ ▸ 4 commits                                                                │
 ▒│ │ ▸ 6 checks                                                                 │
 ▒│ │                                                                            │
-█│ ○ auth/middleware                                                    +242 -6 │
-█│ │ #104 Require a session on every API route                         approved │
-█│ │ 1 unresolved                                                     ✓ passing │
+█│ ○ auth/middleware                                                  ✓ passing │
+█│ │ #104  OPEN  Require a session on every API route                   +242 -6 │
+█│ │ approved · 1 unresolved                                                    │
 █│ │ ▸ 3 files + 1 generated                                                    │
 █│ │ ▸ 3 commits                                                                │
 █│ │ ▸ 4 checks                                                                 │
 █│ │                                                                            │
- │ ◎ auth/token-refresh                                                +184 -12 │
- │ │ #103 Refresh access tokens before they expire                       queued │
- │ │                                                                  ✓ passing │
+ │ ◎ auth/token-refresh                                               ✓ passing │
+ │ │ #103  QUEUED  Refresh access tokens before they expire            +184 -12 │
+ │ │ approved                                                                   │
  │ │ ▸ 2 files                                                                  │
  │ │ ▸ 2 commits                                                                │
  │ │ ▸ 3 checks                                                                 │
@@ -34,7 +36,5 @@
  │ ── merged ────────────────────────────────────────────────────────────────── │
  │ ✓ auth/redis-sessions  #102 Back sessions with Redis                  merged │
  │ ✓ auth/session-store  #101 Extract a session store interface          merged │
- │ └ main                                                                       │
- │                                                                              │
- ╰──────────────────────────────────────────────────────────────────────────────╯
+ ╰───────────────────────────────────────────────────────────────────────── ↓1 ─╯
    select  2  R review  D draft/ready  A reviewers  space mark  esc clear
