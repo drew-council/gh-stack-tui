@@ -2,7 +2,6 @@ package reviewtui
 
 import (
 	"fmt"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -246,72 +245,29 @@ func (m Model) find(number int) (review.Item, bool) {
 	return review.Item{}, false
 }
 
-var (
-	mdComment = regexp.MustCompile(`(?s)<!--.*?-->`)
-	mdImage   = regexp.MustCompile(`!\[([^\]]*)\]\([^)]*\)|<img[^>]*>`)
-	mdLink    = regexp.MustCompile(`\[([^\]]+)\]\((?:https?://|#|/)[^)]*\)`)
-	mdTag     = regexp.MustCompile(`</?[a-zA-Z][^>]*>`)
-	mdHeading = regexp.MustCompile(`^#{1,6}\s+(.*?)\s*#*$`)
-	mdItem    = regexp.MustCompile(`^(\s*(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?)`)
-)
-
-// markdown lays a PR description out for reading, w columns wide. It does
-// not render Markdown: it drops what only a browser shows, sets headings
-// apart, and wraps the rest, hanging list items under their text.
-func (m Model) markdown(body string, w int) []string {
-	s := m.st
-	body = mdComment.ReplaceAllString(body, "")
-	body = mdImage.ReplaceAllString(body, "[image]")
-	body = mdLink.ReplaceAllString(body, "$1")
-	body = mdTag.ReplaceAllString(body, "")
-	var out []string
-	fenced := false
-	for _, l := range strings.Split(squeeze(strings.TrimSpace(body)), "\n") {
-		if strings.HasPrefix(strings.TrimSpace(l), "```") {
-			fenced = !fenced
-			continue
-		}
-		if fenced {
-			out = append(out, s.Dim.Render(ui.Pad("  "+strings.ReplaceAll(l, "\t", "  "), w)))
-			continue
-		}
-		if h := mdHeading.FindStringSubmatch(l); h != nil {
-			// Headings stand apart from the text above them.
-			if len(out) > 0 && out[len(out)-1] != "" {
-				out = append(out, "")
-			}
-			out = append(out, s.Title.Render(ansi.Truncate(h[1], w, "…")))
-			continue
-		}
-		if l == "" {
-			out = append(out, "")
-			continue
-		}
-		l = strings.ReplaceAll(l, "**", "")
-		hang := lipgloss.Width(mdItem.FindString(l))
-		for i, part := range wrap(l, w-hang) {
-			if i > 0 || hang == 0 {
-				part = strings.Repeat(" ", hang) + strings.TrimLeft(part, " ")
-			}
-			out = append(out, s.Normal.Render(part))
-		}
-	}
-	return out
+// mdKey identifies a rendered description: its text and its width.
+type mdKey struct {
+	body  string
+	width int
 }
 
-// squeeze drops blank lines that follow a blank line.
-func squeeze(text string) string {
-	var out []string
-	blank := false
-	for _, l := range strings.Split(strings.ReplaceAll(text, "\r", ""), "\n") {
-		l = strings.TrimRight(l, " \t")
-		if l == "" && blank {
-			continue
-		}
-		blank = l == ""
-		out = append(out, l)
+// mdCacheSize is how many rendered descriptions are kept.
+const mdCacheSize = 64
+
+// markdown renders a PR's description w columns wide. Rendering parses the
+// text and highlights its code, which is too slow to do on every frame, so
+// the lines are kept.
+func (m Model) markdown(body string, w int) []string {
+	key := mdKey{body, w}
+	if lines, ok := m.rendered[key]; ok {
+		return lines
 	}
-	return strings.Join(out, "\n")
+	if len(m.rendered) >= mdCacheSize {
+		clear(m.rendered)
+	}
+	lines := m.st.Markdown(body, w)
+	m.rendered[key] = lines
+	return lines
 }
 
 // youLines say what the PR wants from the viewer: the need, who asked whom

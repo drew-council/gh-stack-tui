@@ -9,7 +9,7 @@ Agents MAY update this file without asking. When a change makes something here w
 - `cmd/ghst`, `cmd/ghrv`: the programs. They parse flags and wire the packages below; nothing else belongs there.
 - `internal/stacktui`: `ghst`'s model, key handling, and rendering.
 - `internal/reviewtui`: `ghrv`'s model, key handling, and rendering.
-- `internal/ui`: what the TUIs share: the palette and styles, panels, key hints, the help screen, and the clipboard and browser commands. `internal/ui/uitest` compares screens to golden files.
+- `internal/ui`: what the TUIs share: the palette and styles, panels, key hints, the help screen, Markdown rendering, and the clipboard and browser commands. `internal/ui/uitest` compares screens to golden files.
 - `internal/desktop`: the clipboard, the browser, and herdr and tmux tabs.
 - `internal/github`: GraphQL and REST queries: PR, CI, and reviewer state for `ghst`, the review queue and GitHub's stacks for `ghrv`.
 - `internal/review`: what each PR of a review queue needs from the viewer, and how the queue groups into stacks. No I/O.

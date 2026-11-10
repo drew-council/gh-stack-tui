@@ -394,7 +394,11 @@ func Details(now time.Time) map[int]*github.ReviewDetail {
 		304: {
 			Body: "List, get, and finalize invoices over the billing API.\n\n" +
 				"The handlers are thin: they check the caller may see the account, " +
-				"then call the billing package from the layer below.",
+				"then call the billing package from the layer below.\n\n" +
+				"### Before merging\n\n" +
+				"- [x] `buf lint` passes\n" +
+				"- [ ] `buf breaking` passes against `main`\n" +
+				"- [ ] Docs for `ListInvoices` paging",
 			Files: []github.ChangedFile{
 				file("A", "api/billing/v1/invoices.proto", 96, 0),
 				file("M", "api/billing/v1/invoices.pb.go", 214, 30),
@@ -510,12 +514,23 @@ func Details(now time.Time) map[int]*github.ReviewDetail {
 			Checks: green,
 		},
 		325: {
-			Body: "Replaces the gateway's printf logging with log/slog.\n\n" +
-				"Every request logs once, with the route, the caller, the status, and " +
-				"how long it took. Handlers add attributes to the request's logger " +
-				"instead of writing lines of their own.\n\n" +
-				"Large because it touches every handler. The first commit adds the " +
-				"middleware and is the one to read closely; the rest is mechanical.",
+			Body: "<!-- What does this change, and why? -->\n" +
+				"## Why\n\n" +
+				"The gateway logs with `fmt.Printf`, a line here and a line there, " +
+				"and nothing ties the lines of one request together.\n\n" +
+				"## What\n\n" +
+				"Every request now logs **once**, with `log/slog`:\n\n" +
+				"- the route and the caller\n" +
+				"- the status, and how long it took\n" +
+				"- whatever the handler added on the way\n\n" +
+				"Handlers add attributes to the request's logger instead of writing " +
+				"lines of their own:\n\n" +
+				"```go\nlogging.From(ctx).With(\"team\", team.ID)\n```\n\n" +
+				"## Reviewing\n\n" +
+				"> Large because it touches every handler.\n\n" +
+				"The first commit adds the middleware and is the one to read closely. " +
+				"The rest is mechanical. See the " +
+				"[logging guide](https://example.com/guides/logging) for the field names.",
 			Files: []github.ChangedFile{
 				file("A", "internal/gateway/logging.go", 164, 0),
 				file("A", "internal/gateway/logging_test.go", 212, 0),

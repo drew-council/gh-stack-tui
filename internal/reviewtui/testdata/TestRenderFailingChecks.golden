@@ -29,18 +29,18 @@
  │                                                                                                                                  ││ The handlers are thin: they check the caller may see the         │
  │                                                                                                                                  ││ account, then call the billing package from the layer below.     │
  │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││ Before merging                                                   │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││ [✓] buf lint passes                                              │
+ │                                                                                                                                  ││ [ ] buf breaking passes against main                             │
+ │                                                                                                                                  ││ [ ] Docs for ListInvoices paging                                 │
+ │                                                                                                                                  ││                                                                  │
  │                                                                                                                                  ││ ── 4 files + 1 generated ─────────────────────────────────────── │
  │                                                                                                                                  ││ A api/billing/v1/invoices.proto                              +96 │
  │                                                                                                                                  ││ A internal/http/invoices.go                                 +132 │
  │                                                                                                                                  ││ A internal/http/invoices_test.go                             +88 │
  │                                                                                                                                  ││ M internal/http/router.go                                  +6 -1 │
  │                                                                                                                                  ││   1 generated file                                      +214 -30 │
- │                                                                                                                                  ││                                                                  │
- │                                                                                                                                  ││                                                                  │
- │                                                                                                                                  ││                                                                  │
- │                                                                                                                                  ││                                                                  │
- │                                                                                                                                  ││                                                                  │
- │                                                                                                                                  ││                                                                  │
  │                                                                                                                                  ││                                                                  │
  │                                                                                                                                  ││                                                                  │
  │                                                                                                                                  ││                                                                  │

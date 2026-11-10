@@ -37,7 +37,7 @@
           inherit version;
           src = ./.;
           nativeBuildInputs = [ pkgs.git ];
-          vendorHash = "sha256-6iZbI1DjuOHNs8lkVPqEJjVEDaLuCc9jSZClvNgkTzE=";
+          vendorHash = "sha256-UuAO8xkmPUQrLqUq+iMMhaHGaVBBDd+s77FeCt7Hgjo=";
           # The gh-stack shim is its own module; see third_party/gh-stack.
           excludedPackages = [ "third_party" ];
         };

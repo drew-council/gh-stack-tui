@@ -23,8 +23,8 @@
  │  ╰ main                                                                                                                          ││                                                                  │
  │                                                                                                                                  ││ What                                                             │
  │                                                                                                                                  ││                                                                  │
- │                                                                                                                                  ││ - Evict the user's entry when membership changes.                │
- │                                                                                                                                  ││ - Publish the eviction, so every gateway instance drops it.      │
+ │                                                                                                                                  ││ • Evict the user's entry when membership changes.                │
+ │                                                                                                                                  ││ • Publish the eviction, so every gateway instance drops it.      │
  │                                                                                                                                  ││                                                                  │
  │                                                                                                                                  ││ ── 3 files ───────────────────────────────────────────────────── │
  │                                                                                                                                  ││ M internal/teams/cache.go                                 +31 -6 │

@@ -72,6 +72,9 @@ type Model struct {
 	// not asked for again until the queue refreshes.
 	failedDetails map[int]string
 	detailErr     error
+	// rendered are the descriptions rendered so far. Copies of the model
+	// share them.
+	rendered map[mdKey][]string
 
 	remoteErr  error
 	lastRemote time.Time
@@ -143,6 +146,7 @@ func New(opts Options) Model {
 		details:        map[int]cache.Detail{},
 		loadingDetails: map[int]struct{}{},
 		failedDetails:  map[int]string{},
+		rendered:       map[mdKey][]string{},
 		tabs:           map[int]string{},
 		opened:         map[int]openedTab{},
 		expanded:       map[int]struct{}{},

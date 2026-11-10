@@ -368,29 +368,20 @@ func TestQuit(t *testing.T) {
 	}
 }
 
-func TestMarkdownReadsAsText(t *testing.T) {
-	m := demoModel(t, 200, 50)
-	body := "<!-- Describe the change. -->\n## Why\nSee [the design](https://example.com/d) " +
-		"and ![a diagram](https://example.com/d.png).\n\n\n\n### What ###\n" +
-		"- **First** item that is long enough to wrap around\n" +
-		"1. [x] Second\n<details>\n```go\nfunc main() {}\n```\n</details>"
-	var got []string
-	for _, l := range m.markdown(body, 30) {
-		got = append(got, strings.TrimRight(ansi.Strip(l), " "))
+// A description is rendered once per width, not on every frame.
+func TestDescriptionIsRenderedOnce(t *testing.T) {
+	m := onPR(t, demoModel(t, 200, 50), 324)
+	m.render()
+	first := len(m.rendered)
+	if first == 0 {
+		t.Fatal("the hovered PR's description should be rendered")
 	}
-	want := []string{
-		"Why",
-		"See the design and [image].",
-		"",
-		"What",
-		"- First item that is long",
-		"  enough to wrap around",
-		"1. [x] Second",
-		"",
-		"  func main() {}",
+	m.render()
+	if m = update(m, tea.WindowSizeMsg{Width: 200, Height: 40}); len(m.rendered) != first {
+		t.Fatalf("rendered %d descriptions, want %d", len(m.rendered), first)
 	}
-	if !slices.Equal(got, want) {
-		t.Fatalf("got:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	if !strings.Contains(ansi.Strip(m.render()), "• Evict the user's entry") {
+		t.Fatal("the description's list should be rendered as a list")
 	}
 }
 

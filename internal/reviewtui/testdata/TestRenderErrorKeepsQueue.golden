@@ -15,16 +15,16 @@
  │    ● #318  Cache team membership lookups for a mi…  priya-n  review     ✓1 ✗1  ✓   +143   -27     4d ││ 4 passed                                             │
  │    ● #322  Fix the flaky session expiry test        priya-n  review            ✓    +12    -4    40m ││                                                      │
  │    ● #324  on #318 Drop cached teams when a user …  priya-n  review            ✓    +58    -9    19h ││ ── description ───────────────────────────────────── │
- │                                                                                                      ││ Replaces the gateway's printf logging with log/slog. │
+ │                                                                                                      ││ Why                                                  │
  │  ╭ tobiasr · stack #342 · 10 PRs on main                                   2 for you · start at #337 ││                                                      │
- │  │ ┊ 3 PRs  1 in review · 2 draft                                                                    ││ Every request logs once, with the route, the caller, │
- │  │ ● #338  Paginate search results with cursors              review            ✓   +164   -40     7h ││ the status, and how long it took. Handlers add       │
- │▎ │ ● #337  Search users by name and email                    review     ✓1     ✓   +166   -12     7h ││ attributes to the request's logger instead of        │
- │  │ ┊ 5 PRs  1 approved · 4 merged                                                                    ││ writing lines of their own.                          │
- │  ╰ main                                                                                              ││                                                      │
- │                                                                                                      ││ Large because it touches every handler. The first    │
- │                                                                                                      ││ commit adds the middleware and is the one to read    │
- │                                                                                                      ││ closely; the rest is mechanical.                     │
+ │  │ ┊ 3 PRs  1 in review · 2 draft                                                                    ││ The gateway logs with fmt.Printf, a line here and a  │
+ │  │ ● #338  Paginate search results with cursors              review            ✓   +164   -40     7h ││ line there, and nothing ties the lines of one        │
+ │▎ │ ● #337  Search users by name and email                    review     ✓1     ✓   +166   -12     7h ││ request together.                                    │
+ │  │ ┊ 5 PRs  1 approved · 4 merged                                                                    ││                                                      │
+ │  ╰ main                                                                                              ││ What                                                 │
  │                                                                                                      ││                                                      │
- ╰─────────────────────────────────────────────────── hidden: 1 draft · 1 bot · 1 waiting · 1 approved ─╯╰──────────────────────────────────────────────── ↓10 ─╯
+ │                                                                                                      ││ Every request now logs once, with log/slog:          │
+ │                                                                                                      ││                                                      │
+ │                                                                                                      ││ • the route and the caller                           │
+ ╰─────────────────────────────────────────────────── hidden: 1 draft · 1 bot · 1 waiting · 1 approved ─╯╰──────────────────────────────────────────────── ↓27 ─╯
   j/k move  enter review in a demo tab  space mark  o browser  y copy URL  J/K scroll details  [ ] groups  . hidden  / filter  ? help

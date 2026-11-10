@@ -142,6 +142,8 @@ Line and file counts leave out generated files, the ones your checkout's `.gitat
 
 A `▎` in the first column marks a pull request that a tab is reviewing. Mauve means selected, as in `ghst`.
 
+Descriptions are rendered from Markdown with [glamour](https://github.com/charmbracelet/glamour), the renderer of `glow`.
+
 The right panel answers, in order: what the pull request is, what it wants from you and who asked, what you said last and whether it changed since, who else reviewed, which checks fail, what is above and below it in its stack, its description, and its files. It loads when the cursor reaches a pull request, and ahead of time for the ones that wait on you.
 
 ### Hidden pull requests
