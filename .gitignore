@@ -2,7 +2,8 @@
 .direnv
 
 # build output
-/gh-stack-tui
+/ghst
+/ghrv
 
 # scripts/shot.nu
 /tmp/

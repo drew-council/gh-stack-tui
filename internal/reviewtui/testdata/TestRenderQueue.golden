@@ -1,0 +1,50 @@
+ ╭─ Review queue · acme/auth-service ──────────────────────────────────────────────────── 8 to review · 1 to re-review · ↻ 12s ago ─╮╭─ #325 ───────────────────────────────────────────────────────────╮
+ │      PR    TITLE                                                      AUTHOR   YOU        VIA       REVS   CI        DIFF  ASKED ││                                                                  │
+█│    ● #325  Add structured logging to the gateway                      elena-v  review     platform         ✓  +1840  -220     2d ││ Add structured logging to the gateway                            │
+ │                                                                                                                                  ││  OPEN  elena-v · opened 2d ago · pushed 2d ago                   │
+ │  ╭ mkowalski · stack #307 · 6 PRs on main                                                              3 for you · start at #303 ││ gateway/slog → main                                              │
+ │  │ ○ #306  Document the invoice lifecycle                                      draft                       ✓    +96    -3        ││ +1840 -220 · 24 files · 9 commits                                │
+ │  │ ● #305  Post invoices to the ledger when they are finalized                 review     go               ●   +198   -14     1d ││ observability · needs-design                                     │
+ │  │ ● #304  Serve invoices over the billing API                                 review     api go           ✗   +536   -61     1d ││                                                                  │
+ │  │ ● #303  Model invoices and line items                                       re-review  go        ✓1     ✓   +412   -38     3h ││ ── you ───────────────────────────────────────────────────────── │
+ │  │ ○ #302  Add the invoices schema migration                                   approved             ✓1     ✓    +84              ││ review                                                           │
+ │  │ ✓ #301  Extract a money package                                             merged                          +310  -122        ││ elena-v asked platform · 2d ago                                  │
+ │  ╰ main                                                                                                                          ││                                                                  │
+ │                                                                                                                                  ││ ── checks ────────────────────────────────────────────────────── │
+ │    ● #318  Cache team membership lookups for a minute                 priya-n  review     go        ✓1 ✗1  ✓   +143   -27     4d ││ 4 passed                                                         │
+ │    ● #322  Fix the flaky session expiry test                          priya-n  review     you              ✓    +12    -4    40m ││                                                                  │
+ │    ● #324  on #318 Drop cached teams when a user leaves a team        priya-n  review     go               ✓    +58    -9    19h ││ ── description ───────────────────────────────────────────────── │
+ │                                                                                                                                  ││ Replaces the gateway's printf logging with log/slog.             │
+ │  ╭ tobiasr · stack #342 · 10 PRs on main                                                               2 for you · start at #337 ││                                                                  │
+ │  │ ┊ 3 PRs  1 in review · 2 draft                                                                                                ││ Every request logs once, with the route, the caller, the status, │
+ │  │ ● #338  Paginate search results with cursors                                review     api              ✓   +164   -40     7h ││ and how long it took. Handlers add attributes to the request's   │
+ │▎ │ ● #337  Search users by name and email                                      review     api       ✓1     ✓   +287   -12     7h ││ logger instead of writing lines of their own.                    │
+ │  │ ┊ 5 PRs  1 approved · 4 merged                                                                                                ││                                                                  │
+ │  ╰ main                                                                                                                          ││ Large because it touches every handler. The first commit adds    │
+ │                                                                                                                                  ││ the middleware and is the one to read closely; the rest is       │
+ │                                                                                                                                  ││ mechanical.                                                      │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││ ── 24 files ──────────────────────────────────────────────────── │
+ │                                                                                                                                  ││ A internal/gateway/logging.go                               +164 │
+ │                                                                                                                                  ││ A internal/gateway/logging_test.go                          +212 │
+ │                                                                                                                                  ││ M internal/gateway/server.go                             +41 -18 │
+ │                                                                                                                                  ││ M internal/gateway/handlers/login.go                     +22 -14 │
+ │                                                                                                                                  ││ M internal/gateway/handlers/logout.go                      +9 -7 │
+ │                                                                                                                                  ││ M internal/gateway/handlers/session.go                   +31 -20 │
+ │                                                                                                                                  ││ M internal/gateway/handlers/token.go                     +44 -29 │
+ │                                                                                                                                  ││ M internal/gateway/handlers/users.go                     +58 -37 │
+ │                                                                                                                                  ││ … 16 more                                                        │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ ╰─────────────────────────────────────────────────────────────────────────────── hidden: 1 draft · 1 bot · 1 waiting · 1 approved ─╯╰──────────────────────────────────────────────────────────────────╯
+  j/k move  enter review in a demo tab  space mark  o browser  y copy URL  J/K scroll details  [ ] groups  . hidden  / filter  ? help

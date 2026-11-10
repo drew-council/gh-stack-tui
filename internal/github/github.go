@@ -164,12 +164,21 @@ func (c *Client) FetchPRs(ctx context.Context, lookups []Lookup) (map[string]*PR
 	return out, nil
 }
 
-// inBatches splits n items into batches of fetchBatchSize and calls fetch on
-// each, fetchConcurrency at a time. The first error cancels the rest and is
-// returned.
+// inBatches splits n items into batches of fetchBatchSize; see [inBatchesOf].
 func inBatches(
 	ctx context.Context,
 	n int,
+	fetch func(ctx context.Context, lo, hi int) error,
+) error {
+	return inBatchesOf(ctx, n, fetchBatchSize, fetch)
+}
+
+// inBatchesOf splits n items into batches of size and calls fetch on each,
+// fetchConcurrency at a time. The first error cancels the rest and is
+// returned.
+func inBatchesOf(
+	ctx context.Context,
+	n, size int,
 	fetch func(ctx context.Context, lo, hi int) error,
 ) error {
 	ctx, cancel := context.WithCancel(ctx)
@@ -178,8 +187,8 @@ func inBatches(
 	var once sync.Once
 	var first error
 	sem := make(chan struct{}, fetchConcurrency)
-	for lo := 0; lo < n; lo += fetchBatchSize {
-		hi := min(lo+fetchBatchSize, n)
+	for lo := 0; lo < n; lo += size {
+		hi := min(lo+size, n)
 		wg.Go(func() {
 			select {
 			case sem <- struct{}{}:

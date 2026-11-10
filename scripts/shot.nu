@@ -1,7 +1,8 @@
 #!/usr/bin/env nu
 
-# Drives `ghst demo` in a private tmux server and screenshots it in full
-# color with freeze. Needs the dev shell for tmux, freeze, and $GHST_SHOT_FONT.
+# Drives `ghst demo`, or `ghrv demo` with --bin ghrv, in a private tmux server
+# and screenshots it in full color with freeze. Needs the dev shell for tmux,
+# freeze, and $GHST_SHOT_FONT.
 
 const socket = "ghst-shot"
 const out = "tmp/shots"
@@ -10,15 +11,22 @@ def --wrapped t [...args: string] {
   ^tmux -L $socket -f /dev/null ...$args
 }
 
-# Builds the demo and starts it at the given size.
-def "main start" [cols: int = 80 rows: int = 50] {
+# Builds a program and starts its demo at the given size. --args runs it with
+# other arguments, and --vars sets variables for it, as "A=1 B=2".
+def "main start" [
+  cols: int = 80
+  rows: int = 50
+  --bin: string = "ghst"
+  --args: string = "demo"
+  --vars: string = ""
+] {
   mkdir $out
-  go build -o $"($out)/ghst" .
+  go build -o $"($out)/($bin)" $"./cmd/($bin)"
   try { t kill-server o+e>| ignore }
   # oxtabs (tab3 on Linux) stops the renderer from moving the cursor with
   # hard tabs, which tmux keeps in captures.
-  let bin = ($"($out)/ghst" | path expand)
-  let cmd = $"stty oxtabs 2>/dev/null || stty tab3; TERM=xterm-256color COLORTERM=truecolor exec ($bin) demo"
+  let exe = ($"($out)/($bin)" | path expand)
+  let cmd = $"stty oxtabs 2>/dev/null || stty tab3; TERM=xterm-256color COLORTERM=truecolor ($vars) exec ($exe) ($args)"
   t new-session -d -s demo -x ($cols | into string) -y ($rows | into string) -e TMUX= $cmd
   sleep 1.5sec
 }

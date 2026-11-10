@@ -29,3 +29,24 @@ CREATE TABLE IF NOT EXISTS reviewers (
   -- []github.Reviewer as JSON.
   data BLOB NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS queues (
+  repo TEXT NOT NULL,
+  -- github.QueueQuery.Key, so the queues of different queries stay apart.
+  query TEXT NOT NULL,
+  fetched_at INTEGER NOT NULL,
+  -- github.Queue as JSON.
+  data BLOB NOT NULL,
+  PRIMARY KEY (repo, query)
+);
+
+CREATE TABLE IF NOT EXISTS details (
+  repo TEXT NOT NULL,
+  number INTEGER NOT NULL,
+  -- github.ReviewPR.Version of the PR the details were fetched for.
+  version TEXT NOT NULL,
+  fetched_at INTEGER NOT NULL,
+  -- github.ReviewDetail as JSON.
+  data BLOB NOT NULL,
+  PRIMARY KEY (repo, number)
+);

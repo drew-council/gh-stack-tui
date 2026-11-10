@@ -1,0 +1,20 @@
+ ╭─ Review queue · acme/auth-service ──────────────────────────────────────────────────────── ↻ 1s ago ─╮╭──────────────────────────────────────────────────────╮
+ │                                                                                                      ││                                                      │
+ │ ✓ Nothing waits on your review.                                                                      ││                                                      │
+ │   2 requests are left out as drafts, bots, or already reviewed. Press . to show them.                ││                                                      │
+ │                                                                                                      ││                                                      │
+ │                                                                                                      ││                                                      │
+ │                                                                                                      ││                                                      │
+ │                                                                                                      ││                                                      │
+ │                                                                                                      ││                                                      │
+ │                                                                                                      ││                                                      │
+ │                                                                                                      ││                                                      │
+ │                                                                                                      ││                                                      │
+ │                                                                                                      ││                                                      │
+ │                                                                                                      ││                                                      │
+ │                                                                                                      ││                                                      │
+ │                                                                                                      ││                                                      │
+ │                                                                                                      ││                                                      │
+ │                                                                                                      ││                                                      │
+ ╰──────────────────────────────────────────────────────── 3 more not loaded · hidden: 1 draft · 1 bot ─╯╰──────────────────────────────────────────────────────╯
+  . hidden  / filter  ctrl+r refresh  q quit  ? help

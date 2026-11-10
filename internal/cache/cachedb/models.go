@@ -4,11 +4,26 @@
 
 package cachedb
 
+type Detail struct {
+	Repo      string
+	Number    int64
+	Version   string
+	FetchedAt int64
+	Data      []byte
+}
+
 type Pr struct {
 	Repo      string
 	Number    int64
 	Branch    string
 	State     string
+	FetchedAt int64
+	Data      []byte
+}
+
+type Queue struct {
+	Repo      string
+	Query     string
 	FetchedAt int64
 	Data      []byte
 }

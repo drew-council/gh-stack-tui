@@ -1,0 +1,40 @@
+ ╭─ Review queue · acme/auth-service ──── 8 to review · 1 to re-review · ↻ 12s ago ─╮
+ │      PR    TITLE                       AUTHOR   YOU        CI        DIFF  ASKED │
+█│    ● #325  Add structured logging to…  elena-v  review     ✓  +1840  -220     2d │
+ │                                                                                  │
+ │  ╭ mkowalski · stack #307 · 6 PRs on main              3 for you · start at #303 │
+ │  │ ○ #306  Document the invoice lifecycle       draft      ✓    +96    -3        │
+ │  │ ● #305  Post invoices to the ledger when t…  review     ●   +198   -14     1d │
+ │  │ ● #304  Serve invoices over the billing API  review     ✗   +536   -61     1d │
+ │  │ ● #303  Model invoices and line items        re-review  ✓   +412   -38     3h │
+ │  │ ○ #302  Add the invoices schema migration    approved   ✓    +84              │
+ │  │ ✓ #301  Extract a money package              merged         +310  -122        │
+ │  ╰ main                                                                          │
+ │                                                                                  │
+ │    ● #318  Cache team membership loo…  priya-n  review     ✓   +143   -27     4d │
+ │    ● #322  Fix the flaky session exp…  priya-n  review     ✓    +12    -4    40m │
+ │    ● #324  on #318 Drop cached teams…  priya-n  review     ✓    +58    -9    19h │
+ │                                                                                  │
+ │  ╭ tobiasr · stack #342 · 10 PRs on main               2 for you · start at #337 │
+ │  │ ┊ 3 PRs  1 in review · 2 draft                                                │
+ │  │ ● #338  Paginate search results with curso…  review     ✓   +164   -40     7h │
+ │▎ │ ● #337  Search users by name and email       review     ✓   +287   -12     7h │
+ │  │ ┊ 5 PRs  1 approved · 4 merged                                                │
+ │  ╰ main                                                                          │
+ │                                                                                  │
+ │                                                                                  │
+ │                                                                                  │
+ │                                                                                  │
+ │                                                                                  │
+ │                                                                                  │
+ │                                                                                  │
+ │                                                                                  │
+ │                                                                                  │
+ │                                                                                  │
+ │                                                                                  │
+ │                                                                                  │
+ │                                                                                  │
+ │                                                                                  │
+ │                                                                                  │
+ ╰─────────────────────────────── hidden: 1 draft · 1 bot · 1 waiting · 1 approved ─╯
+  j/k move  enter review in a demo tab  space mark  o browser  y copy URL  ? help

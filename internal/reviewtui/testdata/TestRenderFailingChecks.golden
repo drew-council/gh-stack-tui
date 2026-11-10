@@ -1,0 +1,50 @@
+ ╭─ Review queue · acme/auth-service ──────────────────────────────────────────────────── 8 to review · 1 to re-review · ↻ 12s ago ─╮╭─ #304 ───────────────────────────────────────────────────────────╮
+ │      PR    TITLE                                                      AUTHOR   YOU        VIA       REVS   CI        DIFF  ASKED ││                                                                  │
+ │    ● #325  Add structured logging to the gateway                      elena-v  review     platform         ✓  +1840  -220     2d ││ Serve invoices over the billing API                              │
+ │                                                                                                                                  ││  OPEN  mkowalski · opened 1d ago · pushed 1d ago                 │
+ │  ╭ mkowalski · stack #307 · 6 PRs on main                                                              3 for you · start at #303 ││ billing/api → billing/model                                      │
+ │  │ ○ #306  Document the invoice lifecycle                                      draft                       ✓    +96    -3        ││ +536 -61 · 12 files · 3 commits                                  │
+ │  │ ● #305  Post invoices to the ledger when they are finalized                 review     go               ●   +198   -14     1d ││ api                                                              │
+█│  │ ● #304  Serve invoices over the billing API                                 review     api go           ✗   +536   -61     1d ││                                                                  │
+ │  │ ● #303  Model invoices and line items                                       re-review  go        ✓1     ✓   +412   -38     3h ││ ── you ───────────────────────────────────────────────────────── │
+ │  │ ○ #302  Add the invoices schema migration                                   approved             ✓1     ✓    +84              ││ review                                                           │
+ │  │ ✓ #301  Extract a money package                                             merged                          +310  -122        ││ mkowalski asked api-readability, go-readability · 1d ago         │
+ │  ╰ main                                                                                                                          ││                                                                  │
+ │                                                                                                                                  ││ ── reviewers ─────────────────────────────────────────────────── │
+ │    ● #318  Cache team membership lookups for a minute                 priya-n  review     go        ✓1 ✗1  ✓   +143   -27     4d ││ ○ tobiasr asked                                                  │
+ │    ● #322  Fix the flaky session expiry test                          priya-n  review     you              ✓    +12    -4    40m ││                                                                  │
+ │    ● #324  on #318 Drop cached teams when a user leaves a team        priya-n  review     go               ✓    +58    -9    19h ││ ── checks ────────────────────────────────────────────────────── │
+ │                                                                                                                                  ││ 2 failed · 3 passed                                              │
+ │  ╭ tobiasr · stack #342 · 10 PRs on main                                                               2 for you · start at #337 ││ ✗ ci / test (ubuntu-latest)                                      │
+ │  │ ┊ 3 PRs  1 in review · 2 draft                                                                                                ││ ✗ ci / buf breaking                                              │
+ │  │ ● #338  Paginate search results with cursors                                review     api              ✓   +164   -40     7h ││ 1 bot thread                                                     │
+ │▎ │ ● #337  Search users by name and email                                      review     api       ✓1     ✓   +287   -12     7h ││                                                                  │
+ │  │ ┊ 5 PRs  1 approved · 4 merged                                                                                                ││ ── stack #307 · 4 of 6 ───────────────────────────────────────── │
+ │  ╰ main                                                                                                                          ││ ↑ #305 Post invoices to the ledger when they are finali…  review │
+ │                                                                                                                                  ││ ↓ #303 Model invoices and line items                   re-review │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││ ── description ───────────────────────────────────────────────── │
+ │                                                                                                                                  ││ List, get, and finalize invoices over the billing API.           │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││ The handlers are thin: they check the caller may see the         │
+ │                                                                                                                                  ││ account, then call the billing package from the layer below.     │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││ ── 12 files ──────────────────────────────────────────────────── │
+ │                                                                                                                                  ││ A api/billing/v1/invoices.proto                              +96 │
+ │                                                                                                                                  ││ M api/billing/v1/invoices.pb.go                         +214 -30 │
+ │                                                                                                                                  ││ A internal/http/invoices.go                                 +132 │
+ │                                                                                                                                  ││ A internal/http/invoices_test.go                             +88 │
+ │                                                                                                                                  ││ M internal/http/router.go                                  +6 -1 │
+ │                                                                                                                                  ││ … 7 more                                                         │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ ╰─────────────────────────────────────────────────────────────────────────────── hidden: 1 draft · 1 bot · 1 waiting · 1 approved ─╯╰──────────────────────────────────────────────────────────────────╯
+  j/k move  enter review in a demo tab  space mark  o browser  y copy URL  J/K scroll details  [ ] groups  . hidden  / filter  ? help

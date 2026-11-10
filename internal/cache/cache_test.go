@@ -158,3 +158,56 @@ func TestNilCache(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestQueueRoundTrip(t *testing.T) {
+	c, _ := open(t)
+	at := time.UnixMilli(time.Now().UnixMilli())
+	teams := github.QueueQuery{Teams: []string{"go", "api"}}
+	queue := &github.Queue{
+		Viewer: "me",
+		PRs:    []*github.ReviewPR{{Number: 7, Requested: true, Via: []string{"go"}}},
+		Stacks: []github.Stack{{Number: 9, Base: "main", PRs: []int{7, 8}}},
+	}
+	if err := c.SaveQueue(repo, teams, queue, at); err != nil {
+		t.Fatal(err)
+	}
+	// The order of the teams does not matter, but the teams do.
+	got, fetched, err := c.Queue(repo, github.QueueQuery{Teams: []string{"api", "go"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, queue) || !fetched.Equal(at) {
+		t.Fatalf("got %+v at %v", got, fetched)
+	}
+	if got, _, err := c.Queue(repo, github.QueueQuery{}); got != nil || err != nil {
+		t.Fatalf("another query found %+v, err %v", got, err)
+	}
+}
+
+func TestDetailsRoundTrip(t *testing.T) {
+	c, _ := open(t)
+	at := time.UnixMilli(time.Now().UnixMilli())
+	details := map[int]Detail{
+		7: {Version: "v1", Detail: &github.ReviewDetail{
+			Number: 7, Body: "why", Files: []github.ChangedFile{{Path: "a.go", Status: "M"}},
+		}},
+	}
+	if err := c.SaveDetails(repo, details, at); err != nil {
+		t.Fatal(err)
+	}
+	got, err := c.Details(repo, []int{7, 8})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, details) {
+		t.Fatalf("got %+v", got)
+	}
+	// A nil cache finds nothing and saves nothing.
+	var none *Cache
+	if got, err := none.Details(repo, []int{7}); got != nil || err != nil {
+		t.Fatalf("nil cache: %+v, %v", got, err)
+	}
+	if err := none.SaveQueue(repo, github.QueueQuery{}, &github.Queue{}, at); err != nil {
+		t.Fatal(err)
+	}
+}

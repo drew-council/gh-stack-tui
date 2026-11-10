@@ -30,6 +30,32 @@
             ./treefmt.nix
           ];
         };
+        version = "0.1.0";
+        # Every program under cmd, built and tested once.
+        programs = (pkgs.buildGoModule.override { go = pkgs.go_1_27; }) {
+          pname = "gh-stack-tui";
+          inherit version;
+          src = ./.;
+          nativeBuildInputs = [ pkgs.git ];
+          vendorHash = "sha256-6iZbI1DjuOHNs8lkVPqEJjVEDaLuCc9jSZClvNgkTzE=";
+          # The gh-stack shim is its own module; see third_party/gh-stack.
+          excludedPackages = [ "third_party" ];
+        };
+        # One of the programs, as a package of its own.
+        program =
+          name: description:
+          pkgs.runCommand "${name}-${version}"
+            {
+              pname = name;
+              inherit version;
+              meta = {
+                inherit description;
+                mainProgram = name;
+              };
+            }
+            ''
+              install -D ${programs}/bin/${name} $out/bin/${name}
+            '';
       in
       {
         devShells.default = pkgs.mkShell {
@@ -49,18 +75,8 @@
         };
 
         packages = rec {
-          ghst = (pkgs.buildGoModule.override { go = pkgs.go_1_27; }) {
-            pname = "ghst";
-            version = "0.1.0";
-            src = ./.;
-            nativeBuildInputs = [ pkgs.git ];
-            vendorHash = "sha256-6iZbI1DjuOHNs8lkVPqEJjVEDaLuCc9jSZClvNgkTzE=";
-            # The gh-stack shim is its own module; see third_party/gh-stack.
-            excludedPackages = [ "third_party" ];
-            postInstall = ''
-              mv $out/bin/gh-stack-tui $out/bin/ghst
-            '';
-          };
+          ghst = program "ghst" "A terminal UI for gh-stack stacks";
+          ghrv = program "ghrv" "A terminal UI for the pull requests that wait on your review";
           default = ghst;
         };
 

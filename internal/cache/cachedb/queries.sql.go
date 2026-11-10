@@ -10,12 +10,30 @@ import (
 	"strings"
 )
 
+const deleteDetailsBefore = `-- name: DeleteDetailsBefore :exec
+DELETE FROM details WHERE fetched_at < ?1
+`
+
+func (q *Queries) DeleteDetailsBefore(ctx context.Context, cutoff int64) error {
+	_, err := q.db.ExecContext(ctx, deleteDetailsBefore, cutoff)
+	return err
+}
+
 const deletePRsBefore = `-- name: DeletePRsBefore :exec
 DELETE FROM prs WHERE fetched_at < ?1
 `
 
 func (q *Queries) DeletePRsBefore(ctx context.Context, cutoff int64) error {
 	_, err := q.db.ExecContext(ctx, deletePRsBefore, cutoff)
+	return err
+}
+
+const deleteQueuesBefore = `-- name: DeleteQueuesBefore :exec
+DELETE FROM queues WHERE fetched_at < ?1
+`
+
+func (q *Queries) DeleteQueuesBefore(ctx context.Context, cutoff int64) error {
+	_, err := q.db.ExecContext(ctx, deleteQueuesBefore, cutoff)
 	return err
 }
 
@@ -35,6 +53,56 @@ DELETE FROM suggested WHERE fetched_at < ?1
 func (q *Queries) DeleteSuggestedBefore(ctx context.Context, cutoff int64) error {
 	_, err := q.db.ExecContext(ctx, deleteSuggestedBefore, cutoff)
 	return err
+}
+
+const details = `-- name: Details :many
+SELECT number, version, data FROM details
+WHERE repo = ?1 AND number IN (/*SLICE:numbers*/?)
+`
+
+type DetailsParams struct {
+	Repo    string
+	Numbers []int64
+}
+
+type DetailsRow struct {
+	Number  int64
+	Version string
+	Data    []byte
+}
+
+func (q *Queries) Details(ctx context.Context, arg DetailsParams) ([]DetailsRow, error) {
+	query := details
+	var queryParams []interface{}
+	queryParams = append(queryParams, arg.Repo)
+	if len(arg.Numbers) > 0 {
+		for _, v := range arg.Numbers {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:numbers*/?", strings.Repeat(",?", len(arg.Numbers))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:numbers*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DetailsRow
+	for rows.Next() {
+		var i DetailsRow
+		if err := rows.Scan(&i.Number, &i.Version, &i.Data); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const openPRsByBranch = `-- name: OpenPRsByBranch :many
@@ -138,6 +206,27 @@ func (q *Queries) PRsByNumber(ctx context.Context, arg PRsByNumberParams) ([]PRs
 	return items, nil
 }
 
+const queue = `-- name: Queue :one
+SELECT fetched_at, data FROM queues WHERE repo = ?1 AND query = ?2
+`
+
+type QueueParams struct {
+	Repo  string
+	Query string
+}
+
+type QueueRow struct {
+	FetchedAt int64
+	Data      []byte
+}
+
+func (q *Queries) Queue(ctx context.Context, arg QueueParams) (QueueRow, error) {
+	row := q.db.QueryRowContext(ctx, queue, arg.Repo, arg.Query)
+	var i QueueRow
+	err := row.Scan(&i.FetchedAt, &i.Data)
+	return i, err
+}
+
 const reviewers = `-- name: Reviewers :one
 SELECT fetched_at, data FROM reviewers WHERE repo = ?1
 `
@@ -204,6 +293,35 @@ func (q *Queries) Suggested(ctx context.Context, arg SuggestedParams) ([]Suggest
 	return items, nil
 }
 
+const upsertDetail = `-- name: UpsertDetail :exec
+INSERT INTO details (repo, number, version, fetched_at, data)
+VALUES (?1, ?2, ?3, ?4, ?5)
+ON CONFLICT (repo, number) DO UPDATE SET
+  version = excluded.version,
+  fetched_at = excluded.fetched_at,
+  data = excluded.data
+WHERE excluded.fetched_at >= details.fetched_at
+`
+
+type UpsertDetailParams struct {
+	Repo      string
+	Number    int64
+	Version   string
+	FetchedAt int64
+	Data      []byte
+}
+
+func (q *Queries) UpsertDetail(ctx context.Context, arg UpsertDetailParams) error {
+	_, err := q.db.ExecContext(ctx, upsertDetail,
+		arg.Repo,
+		arg.Number,
+		arg.Version,
+		arg.FetchedAt,
+		arg.Data,
+	)
+	return err
+}
+
 const upsertPR = `-- name: UpsertPR :exec
 INSERT INTO prs (repo, number, branch, state, fetched_at, data)
 VALUES (?1, ?2, ?3, ?4, ?5, ?6)
@@ -231,6 +349,32 @@ func (q *Queries) UpsertPR(ctx context.Context, arg UpsertPRParams) error {
 		arg.Number,
 		arg.Branch,
 		arg.State,
+		arg.FetchedAt,
+		arg.Data,
+	)
+	return err
+}
+
+const upsertQueue = `-- name: UpsertQueue :exec
+INSERT INTO queues (repo, query, fetched_at, data)
+VALUES (?1, ?2, ?3, ?4)
+ON CONFLICT (repo, query) DO UPDATE SET
+  fetched_at = excluded.fetched_at,
+  data = excluded.data
+WHERE excluded.fetched_at >= queues.fetched_at
+`
+
+type UpsertQueueParams struct {
+	Repo      string
+	Query     string
+	FetchedAt int64
+	Data      []byte
+}
+
+func (q *Queries) UpsertQueue(ctx context.Context, arg UpsertQueueParams) error {
+	_, err := q.db.ExecContext(ctx, upsertQueue,
+		arg.Repo,
+		arg.Query,
 		arg.FetchedAt,
 		arg.Data,
 	)

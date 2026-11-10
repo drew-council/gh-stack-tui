@@ -1,0 +1,50 @@
+ ╭─ Review queue · acme/auth-service ──────────────────────────────────────────────────── 8 to review · 1 to re-review · ↻ 12s ago ─╮╭─ Stack #342 ─────────────────────────────────────────────────────╮
+ │      PR    TITLE                                                      AUTHOR   YOU        VIA       REVS   CI        DIFF  ASKED ││                                                                  │
+ │    ● #325  Add structured logging to the gateway                      elena-v  review     platform         ✓  +1840  -220     2d ││ tobiasr · 10 PRs on main                                         │
+ │                                                                                                                                  ││ 2 PRs wait on you · +451 -52 in 15 files                         │
+ │  ╭ mkowalski · stack #307 · 6 PRs on main                                                              3 for you · start at #303 ││ review from the bottom: start at #337                            │
+ │  │ ○ #306  Document the invoice lifecycle                                      draft                       ✓    +96    -3        ││                                                                  │
+ │  │ ● #305  Post invoices to the ledger when they are finalized                 review     go               ●   +198   -14     1d ││ ── pull requests ─────────────────────────────────────────────── │
+ │  │ ● #304  Serve invoices over the billing API                                 review     api go           ✗   +536   -61     1d ││ ○ #341 Add a search box to the admin console               draft │
+ │  │ ● #303  Model invoices and line items                                       re-review  go        ✓1     ✓   +412   -38     3h ││ ○ #340 Search audit log entries                            draft │
+ │  │ ○ #302  Add the invoices schema migration                                   approved             ✓1     ✓    +84              ││ ○ #339 Highlight the matched text                      in review │
+ │  │ ✓ #301  Extract a money package                                             merged                          +310  -122        ││ ● #338 Paginate search results with cursors               review │
+ │  ╰ main                                                                                                                          ││ ● #337 Search users by name and email                     review │
+ │                                                                                                                                  ││ ○ #336 Rank exact matches first                         approved │
+ │    ● #318  Cache team membership lookups for a minute                 priya-n  review     go        ✓1 ✗1  ✓   +143   -27     4d ││ ✓ #335 Backfill the index from Postgres                   merged │
+ │    ● #322  Fix the flaky session expiry test                          priya-n  review     you              ✓    +12    -4    40m ││ ✓ #334 Index teams and their members                      merged │
+ │    ● #324  on #318 Drop cached teams when a user leaves a team        priya-n  review     go               ✓    +58    -9    19h ││ ✓ #333 Index users as they change                         merged │
+ │                                                                                                                                  ││ ✓ #332 Add a search index interface                       merged │
+█│  ╭ tobiasr · stack #342 · 10 PRs on main                                                               2 for you · start at #337 ││                                                                  │
+░│  │ ┊ 3 PRs  1 in review · 2 draft                                                                                                ││                                                                  │
+░│  │ ● #338  Paginate search results with cursors                                review     api              ✓   +164   -40     7h ││                                                                  │
+░│▎ │ ● #337  Search users by name and email                                      review     api       ✓1     ✓   +287   -12     7h ││                                                                  │
+░│  │ ┊ 5 PRs  1 approved · 4 merged                                                                                                ││                                                                  │
+░│  ╰ main                                                                                                                          ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ ╰─────────────────────────────────────────────────────────────────────────────── hidden: 1 draft · 1 bot · 1 waiting · 1 approved ─╯╰──────────────────────────────────────────────────────────────────╯
+  j/k move  enter review the stack's PRs for you  space mark them  l/h unfold/fold  [ ] groups  . hidden  / filter  ? help

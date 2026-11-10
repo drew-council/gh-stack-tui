@@ -20,21 +20,36 @@ type fakeGitHub struct {
 	statuses []int
 	body     string
 	requests []string
+	// route, when set, answers the requests it knows; the rest get status
+	// and body.
+	route func(request string) (status int, body string, ok bool)
 }
 
 func (f *fakeGitHub) RoundTrip(req *http.Request) (*http.Response, error) {
-	body, _ := io.ReadAll(req.Body)
+	var body []byte
+	if req.Body != nil {
+		body, _ = io.ReadAll(req.Body)
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.requests = append(f.requests, req.Method+" "+req.URL.Path+" "+string(body))
-	status := f.status
+	request := req.Method + " " + req.URL.Path + " " + string(body)
+	if req.URL.RawQuery != "" {
+		request = req.Method + " " + req.URL.Path + "?" + req.URL.RawQuery + " " + string(body)
+	}
+	f.requests = append(f.requests, request)
+	status, answer := f.status, f.body
 	if len(f.statuses) > 0 {
 		status, f.statuses = f.statuses[0], f.statuses[1:]
+	}
+	if f.route != nil {
+		if s, b, ok := f.route(request); ok {
+			status, answer = s, b
+		}
 	}
 	return &http.Response{
 		StatusCode: status,
 		Header:     http.Header{"Content-Type": {"application/json"}},
-		Body:       io.NopCloser(strings.NewReader(f.body)),
+		Body:       io.NopCloser(strings.NewReader(answer)),
 		Request:    req,
 	}, nil
 }

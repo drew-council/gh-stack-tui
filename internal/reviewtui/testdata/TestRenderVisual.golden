@@ -1,0 +1,50 @@
+ ╭─ Review queue · acme/auth-service ──────────────────────────────────────────────────── 8 to review · 1 to re-review · ↻ 12s ago ─╮╭─ #302 ───────────────────────────────────────────────────────────╮
+ │      PR    TITLE                                                      AUTHOR   YOU        VIA       REVS   CI        DIFF  ASKED ││                                                                  │
+ │    ● #325  Add structured logging to the gateway                      elena-v  review     platform         ✓  +1840  -220     2d ││ Add the invoices schema migration                                │
+ │                                                                                                                                  ││  OPEN  mkowalski · opened 2d ago · pushed 2d ago                 │
+ │  ╭ mkowalski · stack #307 · 6 PRs on main                                                              3 for you · start at #303 ││ billing/schema → main                                            │
+ │  │ ○ #306  Document the invoice lifecycle                                      draft                       ✓    +96    -3        ││ +84 · 3 files · 2 commits                                        │
+▒│  │ ◆ #305  Post invoices to the ledger when they are finalized                 review     go               ●   +198   -14     1d ││                                                                  │
+▒│  │ ◆ #304  Serve invoices over the billing API                                 review     api go           ✗   +536   -61     1d ││ ── you ───────────────────────────────────────────────────────── │
+▒│  │ ◆ #303  Model invoices and line items                                       re-review  go        ✓1     ✓   +412   -38     3h ││ approved                                                         │
+█│  │ ○ #302  Add the invoices schema migration                                   approved             ✓1     ✓    +84              ││ you approved 3d ago                                              │
+ │  │ ✓ #301  Extract a money package                                             merged                          +310  -122        ││                                                                  │
+ │  ╰ main                                                                                                                          ││ ── reviewers ─────────────────────────────────────────────────── │
+ │                                                                                                                                  ││ ✓ tobiasr approved 2d ago                                        │
+ │    ● #318  Cache team membership lookups for a minute                 priya-n  review     go        ✓1 ✗1  ✓   +143   -27     4d ││                                                                  │
+ │    ● #322  Fix the flaky session expiry test                          priya-n  review     you              ✓    +12    -4    40m ││ ── checks ────────────────────────────────────────────────────── │
+ │    ● #324  on #318 Drop cached teams when a user leaves a team        priya-n  review     go               ✓    +58    -9    19h ││ ✓ passing                                                        │
+ │                                                                                                                                  ││                                                                  │
+ │  ╭ tobiasr · stack #342 · 10 PRs on main                                                               2 for you · start at #337 ││ ── stack #307 · 2 of 6 ───────────────────────────────────────── │
+ │  │ ┊ 3 PRs  1 in review · 2 draft                                                                                                ││ ↑ #303 Model invoices and line items                   re-review │
+ │  │ ● #338  Paginate search results with cursors                                review     api              ✓   +164   -40     7h ││ ↓ #301 Extract a money package                            merged │
+ │▎ │ ● #337  Search users by name and email                                      review     api       ✓1     ✓   +287   -12     7h ││                                                                  │
+ │  │ ┊ 5 PRs  1 approved · 4 merged                                                                                                ││ ── description ───────────────────────────────────────────────── │
+ │  ╰ main                                                                                                                          ││ No description.                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ ╰─────────────────────────────────────────────────────────────────────────────── hidden: 1 draft · 1 bot · 1 waiting · 1 approved ─╯╰──────────────────────────────────────────────────────────────────╯
+   visual  3  enter review in demo tabs  o browser  y copy URLs  space mark  v visual  esc clear

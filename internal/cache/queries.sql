@@ -50,3 +50,33 @@ DELETE FROM suggested WHERE fetched_at < @cutoff;
 
 -- name: DeleteReviewersBefore :exec
 DELETE FROM reviewers WHERE fetched_at < @cutoff;
+
+-- name: Queue :one
+SELECT fetched_at, data FROM queues WHERE repo = @repo AND query = @query;
+
+-- name: UpsertQueue :exec
+INSERT INTO queues (repo, query, fetched_at, data)
+VALUES (@repo, @query, @fetched_at, @data)
+ON CONFLICT (repo, query) DO UPDATE SET
+  fetched_at = excluded.fetched_at,
+  data = excluded.data
+WHERE excluded.fetched_at >= queues.fetched_at;
+
+-- name: Details :many
+SELECT number, version, data FROM details
+WHERE repo = @repo AND number IN (sqlc.slice('numbers'));
+
+-- name: UpsertDetail :exec
+INSERT INTO details (repo, number, version, fetched_at, data)
+VALUES (@repo, @number, @version, @fetched_at, @data)
+ON CONFLICT (repo, number) DO UPDATE SET
+  version = excluded.version,
+  fetched_at = excluded.fetched_at,
+  data = excluded.data
+WHERE excluded.fetched_at >= details.fetched_at;
+
+-- name: DeleteQueuesBefore :exec
+DELETE FROM queues WHERE fetched_at < @cutoff;
+
+-- name: DeleteDetailsBefore :exec
+DELETE FROM details WHERE fetched_at < @cutoff;

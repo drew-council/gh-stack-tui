@@ -1,0 +1,50 @@
+ ╭─ Review queue · acme/auth-service ──────────────────────────────────────────────────── 8 to review · 1 to re-review · ↻ 12s ago ─╮╭─ #318 ───────────────────────────────────────────────────────────╮
+ │      PR    TITLE                                                           AUTHOR   YOU        VIA  REVS   CI        DIFF  ASKED ││                                                                  │
+█│    ● #318  Cache team membership lookups for a minute                      priya-n  review     go   ✓1 ✗1  ✓   +143   -27     4d ││ Cache team membership lookups for a minute                       │
+ │    ● #322  Fix the flaky session expiry test                               priya-n  review     you         ✓    +12    -4    40m ││  OPEN  priya-n · opened 23h ago · pushed 20h ago                 │
+ │    ● #324  on #318 Drop cached teams when a user leaves a team             priya-n  review     go          ✓    +58    -9    19h ││ perf/team-cache → main                                           │
+ │                                                                                                                                  ││ +143 -27 · 4 files · 4 commits · conflicts                       │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││ ── you ───────────────────────────────────────────────────────── │
+ │                                                                                                                                  ││ review                                                           │
+ │                                                                                                                                  ││ priya-n asked go-readability · 4d ago                            │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││ ── reviewers ─────────────────────────────────────────────────── │
+ │                                                                                                                                  ││ ✓ tobiasr approved 3d ago                                        │
+ │                                                                                                                                  ││ ✗ sam requested changes 20h ago                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││ ── checks ────────────────────────────────────────────────────── │
+ │                                                                                                                                  ││ 4 passed                                                         │
+ │                                                                                                                                  ││ 1 unresolved thread                                              │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││ ── description ───────────────────────────────────────────────── │
+ │                                                                                                                                  ││ Every request looked the caller's teams up in Postgres. This     │
+ │                                                                                                                                  ││ caches them per user for a minute.                               │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││ Membership changes take up to a minute to apply, which the       │
+ │                                                                                                                                  ││ security review accepted for everything but removal from an      │
+ │                                                                                                                                  ││ admin team; that still checks the database.                      │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││ ── 4 files ───────────────────────────────────────────────────── │
+ │                                                                                                                                  ││ A internal/teams/cache.go                                    +84 │
+ │                                                                                                                                  ││ A internal/teams/cache_test.go                               +51 │
+ │                                                                                                                                  ││ M internal/teams/lookup.go                                +8 -22 │
+ │                                                                                                                                  ││ M config/defaults.yaml                                        -5 │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ │                                                                                                                                  ││                                                                  │
+ ╰─────────────────────────────────────────────────────────────────────────────── hidden: 1 draft · 1 bot · 1 waiting · 1 approved ─╯╰──────────────────────────────────────────────────────────────────╯
+  /priya

@@ -42,6 +42,13 @@ type Cache struct {
 	q  *cachedb.Queries
 }
 
+// Detail is the details of a PR in a review queue, as fetched for one
+// [github.ReviewPR.Version].
+type Detail struct {
+	Version string
+	Detail  *github.ReviewDetail
+}
+
 // Suggestion is GitHub's reviewer suggestions for a PR at one head commit.
 type Suggestion struct {
 	Head   string
@@ -64,7 +71,9 @@ func Dir() (string, error) {
 func fileName() string {
 	h := sha256.New()
 	io.WriteString(h, schema)
-	for _, v := range []any{github.PR{}, []github.Reviewer{}} {
+	for _, v := range []any{
+		github.PR{}, []github.Reviewer{}, github.Queue{}, github.ReviewDetail{},
+	} {
 		writeShape(h, reflect.TypeOf(v))
 	}
 	return fmt.Sprintf("cache-%x.db", h.Sum(nil)[:6])
@@ -150,6 +159,8 @@ func (c *Cache) setUp(now time.Time) error {
 			q.DeletePRsBefore(ctx, cutoff),
 			q.DeleteSuggestedBefore(ctx, cutoff),
 			q.DeleteReviewersBefore(ctx, cutoff),
+			q.DeleteQueuesBefore(ctx, cutoff),
+			q.DeleteDetailsBefore(ctx, cutoff),
 		)
 	})
 }
@@ -363,5 +374,103 @@ func (c *Cache) SaveReviewers(repo github.Repo, reviewers []github.Reviewer, at 
 		Repo:      repoKey(repo),
 		FetchedAt: at.UnixMilli(),
 		Data:      data,
+	})
+}
+
+// Queue returns the cached review queue of query and when it was fetched, or
+// nil when there is none.
+func (c *Cache) Queue(repo github.Repo, query github.QueueQuery) (*github.Queue, time.Time, error) {
+	if c == nil {
+		return nil, time.Time{}, nil
+	}
+	row, err := c.q.Queue(
+		context.Background(),
+		cachedb.QueueParams{Repo: repoKey(repo), Query: query.Key()},
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, time.Time{}, nil
+	}
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	var queue github.Queue
+	if err := json.Unmarshal(row.Data, &queue); err != nil {
+		return nil, time.Time{}, err
+	}
+	return &queue, time.UnixMilli(row.FetchedAt), nil
+}
+
+// SaveQueue stores the review queue of query, as fetched at at.
+func (c *Cache) SaveQueue(
+	repo github.Repo,
+	query github.QueueQuery,
+	queue *github.Queue,
+	at time.Time,
+) error {
+	if c == nil || queue == nil {
+		return nil
+	}
+	data, err := json.Marshal(queue)
+	if err != nil {
+		return err
+	}
+	return c.q.UpsertQueue(context.Background(), cachedb.UpsertQueueParams{
+		Repo:      repoKey(repo),
+		Query:     query.Key(),
+		FetchedAt: at.UnixMilli(),
+		Data:      data,
+	})
+}
+
+// Details returns the cached details of the PR numbers that have them.
+func (c *Cache) Details(repo github.Repo, numbers []int) (map[int]Detail, error) {
+	if c == nil || len(numbers) == 0 {
+		return nil, nil
+	}
+	ns := make([]int64, len(numbers))
+	for i, n := range numbers {
+		ns[i] = int64(n)
+	}
+	rows, err := c.q.Details(
+		context.Background(),
+		cachedb.DetailsParams{Repo: repoKey(repo), Numbers: ns},
+	)
+	if err != nil {
+		return nil, err
+	}
+	out := map[int]Detail{}
+	for _, r := range rows {
+		d := Detail{Version: r.Version}
+		if err := json.Unmarshal(r.Data, &d.Detail); err != nil {
+			return nil, err
+		}
+		out[int(r.Number)] = d
+	}
+	return out, nil
+}
+
+// SaveDetails stores details by PR number, as fetched at at.
+func (c *Cache) SaveDetails(repo github.Repo, details map[int]Detail, at time.Time) error {
+	if c == nil || len(details) == 0 {
+		return nil
+	}
+	return c.inTx(func(q *cachedb.Queries, _ *sql.Tx) error {
+		for n, d := range details {
+			data, err := json.Marshal(d.Detail)
+			if err != nil {
+				return err
+			}
+			err = q.UpsertDetail(context.Background(), cachedb.UpsertDetailParams{
+				Repo:      repoKey(repo),
+				Number:    int64(n),
+				Version:   d.Version,
+				FetchedAt: at.UnixMilli(),
+				Data:      data,
+			})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
