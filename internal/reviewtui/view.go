@@ -645,16 +645,46 @@ func (m Model) reviewsCell(pr *github.ReviewPR) string {
 	return strings.Join(parts, " ")
 }
 
+// size is how much of a PR there is to read: the lines and files it changes,
+// with the generated files counted apart.
+type size struct {
+	add, del int
+	// files are the files a person wrote, and generated the rest.
+	files, generated int
+}
+
+// size measures pr without its generated files, as ghst measures a branch.
+// GitHub's totals, which count everything, stand in until the PR's files are
+// loaded, and for a PR with more files than are fetched.
+func (m Model) size(pr *github.ReviewPR) size {
+	d, ok := m.detailOf(pr)
+	if !ok || len(d.Files) < pr.ChangedFiles {
+		return size{add: pr.Additions, del: pr.Deletions, files: pr.ChangedFiles}
+	}
+	var s size
+	for _, f := range d.Files {
+		if f.Generated {
+			s.generated++
+			continue
+		}
+		s.add += f.Additions
+		s.del += f.Deletions
+		s.files++
+	}
+	return s
+}
+
 // diffCell is the lines added and deleted, each in its own half of the cell
 // so they line up down the queue.
 func (m Model) diffCell(pr *github.ReviewPR) string {
 	s := m.st
 	add, del := "", ""
-	if pr.Additions > 0 {
-		add = s.Add.Render(fmt.Sprintf("+%d", pr.Additions))
+	size := m.size(pr)
+	if size.add > 0 {
+		add = s.Add.Render(fmt.Sprintf("+%d", size.add))
 	}
-	if pr.Deletions > 0 {
-		del = s.Del.Render(fmt.Sprintf("-%d", pr.Deletions))
+	if size.del > 0 {
+		del = s.Del.Render(fmt.Sprintf("-%d", size.del))
 	}
 	half := diffW / 2
 	return ui.PadLeft(add, half) + " " + ui.PadLeft(del, half)

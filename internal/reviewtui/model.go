@@ -29,6 +29,9 @@ type Options struct {
 	// ReviewCmd reviews one pull request; {pr} is replaced by its number and
 	// {url} by its URL.
 	ReviewCmd string
+	// Local says which changed files are generated, to leave them out of the
+	// line counts. Nil counts every file.
+	Local Local
 	// Tabs is where reviews open. Nil runs them in the TUI's own terminal.
 	Tabs desktop.Tabs
 	// Query selects the queue, and Show the kinds of PRs it keeps.

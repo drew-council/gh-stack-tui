@@ -106,7 +106,7 @@ func run(dir string, opts reviewtui.Options) error {
 	if err := os.Chdir(repo.Root); err != nil {
 		return err
 	}
-	opts.Dir = repo.Root
+	opts.Dir, opts.Local = repo.Root, repo
 	if opts.Repo, err = github.CurrentRepo(); err != nil {
 		return err
 	}
@@ -128,6 +128,7 @@ func runDemo(opts reviewtui.Options) error {
 	remote := &demo.ReviewRemote{Delay: 600 * time.Millisecond, Now: time.Now}
 	opts.Repo = remote.Repository()
 	opts.Connect = func() (reviewtui.Remote, error) { return remote, nil }
+	opts.Local = demo.Checkout{}
 	opts.Tabs = demo.NewTabs("#337")
 	_, err := tea.NewProgram(reviewtui.New(opts)).Run()
 	return err

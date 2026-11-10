@@ -3,6 +3,8 @@ package reviewtui
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -73,7 +75,7 @@ func (m *Model) loadCached() tea.Cmd {
 	if m.opts.Cache == nil {
 		return nil
 	}
-	c, repo, query := m.opts.Cache, m.opts.Repo, m.opts.Query
+	c, repo, query, local := m.opts.Cache, m.opts.Repo, m.opts.Query, m.opts.Local
 	return func() tea.Msg {
 		queue, at, err := c.Queue(repo, query)
 		if err != nil || queue == nil {
@@ -84,6 +86,10 @@ func (m *Model) loadCached() tea.Cmd {
 			numbers = append(numbers, pr.Number)
 		}
 		details, _ := c.Details(repo, numbers)
+		// .gitattributes may have changed since the details were cached.
+		for _, d := range details {
+			markGenerated(local, d.Detail)
+		}
 		return cachedLoadedMsg{queue: queue, at: at, details: details}
 	}
 }
@@ -271,11 +277,36 @@ func (m *Model) requestDetails() tea.Cmd {
 	for _, n := range numbers {
 		m.loadingDetails[n] = struct{}{}
 	}
-	client := m.gh
+	return m.fetchDetails(versions)
+}
+
+// fetchDetails fetches the details of the PRs in versions, and flags their
+// generated files.
+func (m *Model) fetchDetails(versions map[int]string) tea.Cmd {
+	numbers := slices.Sorted(maps.Keys(versions))
+	client, local := m.gh, m.opts.Local
 	return func() tea.Msg {
 		at := time.Now()
 		details, err := client.FetchReviewDetails(context.Background(), numbers)
+		for _, d := range details {
+			markGenerated(local, d)
+		}
 		return detailsLoadedMsg{versions: versions, details: details, at: at, err: err}
+	}
+}
+
+// markGenerated flags the files of d that local says are generated.
+func markGenerated(local Local, d *github.ReviewDetail) {
+	if local == nil || d == nil {
+		return
+	}
+	paths := make([]string, len(d.Files))
+	for i, f := range d.Files {
+		paths[i] = f.Path
+	}
+	gen := local.Generated(paths)
+	for i := range d.Files {
+		_, d.Files[i].Generated = gen[d.Files[i].Path]
 	}
 }
 

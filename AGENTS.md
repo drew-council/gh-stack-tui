@@ -21,6 +21,8 @@ Code both TUIs need goes in `internal/ui` or `internal/desktop`, not in one TUI'
 
 `ghst`'s model reads stacks through the `Local` interface and PRs through `Remote` (`internal/stacktui/sources.go`). `ghrv`'s model reads its queue through its own `Remote` (`internal/reviewtui/sources.go`) and opens reviews through `desktop.Tabs`. `stack.Source`, `github.Client`, and the herdr and tmux tabs are the real ones and `internal/demo` the fake ones. A model MUST NOT check for the demo. Add a method to an interface instead.
 
+GitHub does not say which files are generated. `ghrv` asks the checkout through `Local`, as `ghst` does through `git.Repo`, and flags the files when their details load. Line and file counts on screen MUST come from `Model.size`, not from the PR's own totals.
+
 `ghrv` learns stacks from GitHub's stacks API, not from the local gh-stack file: the stacks are other people's. The queue's query is cheap on purpose, and `FetchReviewDetails` fetches the costly parts per PR, only when a PR's `Version` changes.
 
 ## Testing

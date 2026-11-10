@@ -1,11 +1,11 @@
  ╭─ Review queue · acme/auth-service ──────────────────────────────────────────────────── 8 to review · 1 to re-review · ↻ 12s ago ─╮╭─ Stack #342 ─────────────────────────────────────────────────────╮
  │      PR    TITLE                                                      AUTHOR   YOU        VIA       REVS   CI        DIFF  ASKED ││                                                                  │
  │    ● #325  Add structured logging to the gateway                      elena-v  review     platform         ✓  +1840  -220     2d ││ tobiasr · 10 PRs on main                                         │
- │                                                                                                                                  ││ 2 PRs wait on you · +451 -52 in 15 files                         │
+ │                                                                                                                                  ││ 2 PRs wait on you · +330 -52 in 7 files                          │
  │  ╭ mkowalski · stack #307 · 6 PRs on main                                                              3 for you · start at #303 ││ review from the bottom: start at #337                            │
  │  │ ○ #306  Document the invoice lifecycle                                      draft                       ✓    +96    -3        ││                                                                  │
  │  │ ● #305  Post invoices to the ledger when they are finalized                 review     go               ●   +198   -14     1d ││ ── pull requests ─────────────────────────────────────────────── │
- │  │ ● #304  Serve invoices over the billing API                                 review     api go           ✗   +536   -61     1d ││ ○ #341 Add a search box to the admin console               draft │
+ │  │ ● #304  Serve invoices over the billing API                                 review     api go           ✗   +322    -1     1d ││ ○ #341 Add a search box to the admin console               draft │
  │  │ ● #303  Model invoices and line items                                       re-review  go        ✓1     ✓   +412   -38     3h ││ ○ #340 Search audit log entries                            draft │
  │  │ ○ #302  Add the invoices schema migration                                   approved             ✓1     ✓    +84              ││ ○ #339 Highlight the matched text                      in review │
  │  │ ✓ #301  Extract a money package                                             merged                          +310  -122        ││ ● #338 Paginate search results with cursors               review │
@@ -18,7 +18,7 @@
 █│  ╭ tobiasr · stack #342 · 10 PRs on main                                                               2 for you · start at #337 ││                                                                  │
 ░│  │ ┊ 3 PRs  1 in review · 2 draft                                                                                                ││                                                                  │
 ░│  │ ● #338  Paginate search results with cursors                                review     api              ✓   +164   -40     7h ││                                                                  │
-░│▎ │ ● #337  Search users by name and email                                      review     api       ✓1     ✓   +287   -12     7h ││                                                                  │
+░│▎ │ ● #337  Search users by name and email                                      review     api       ✓1     ✓   +166   -12     7h ││                                                                  │
 ░│  │ ┊ 5 PRs  1 approved · 4 merged                                                                                                ││                                                                  │
 ░│  ╰ main                                                                                                                          ││                                                                  │
  │                                                                                                                                  ││                                                                  │

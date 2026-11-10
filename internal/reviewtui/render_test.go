@@ -25,6 +25,7 @@ func newDemo(t *testing.T, width, height int) (Model, *demo.ReviewRemote) {
 		Dir:       t.TempDir(),
 		Repo:      remote.Repository(),
 		ReviewCmd: "tuicr pr {url}",
+		Local:     demo.Checkout{},
 		Tabs:      demo.NewTabs("#337"),
 		Connect:   func() (Remote, error) { return remote, nil },
 	})
@@ -56,29 +57,28 @@ func loadQueue(t *testing.T, m Model, remote Remote, queue *github.Queue, age ti
 	t.Helper()
 	m.loadingRemote = true
 	m = update(m, remoteLoadedMsg{client: remote, queue: queue, at: testNow.Add(-age)})
-	return loadDetails(t, m, remote)
+	return loadDetails(t, m)
 }
 
 // loadDetails answers the detail fetches in flight until none is left.
-func loadDetails(t *testing.T, m Model, remote Remote) Model {
+func loadDetails(t *testing.T, m Model) Model {
 	t.Helper()
 	for range 10 {
 		if len(m.loadingDetails) == 0 {
 			return m
 		}
 		versions := map[int]string{}
-		var numbers []int
 		for _, pr := range m.queue.PRs {
 			if _, ok := m.loadingDetails[pr.Number]; ok {
 				versions[pr.Number] = pr.Version()
-				numbers = append(numbers, pr.Number)
 			}
 		}
-		details, err := remote.FetchReviewDetails(context.Background(), numbers)
-		if err != nil {
-			t.Fatal(err)
+		msg := m.fetchDetails(versions)().(detailsLoadedMsg)
+		if msg.err != nil {
+			t.Fatal(msg.err)
 		}
-		m = update(m, detailsLoadedMsg{versions: versions, details: details, at: testNow})
+		msg.at = testNow
+		m = update(m, msg)
 	}
 	t.Fatal("details never finished loading")
 	return m
@@ -108,7 +108,7 @@ func press(t *testing.T, m Model, keys ...string) Model {
 		}
 		m = update(m, msg)
 		if m.gh != nil {
-			m = loadDetails(t, m, m.gh)
+			m = loadDetails(t, m)
 		}
 	}
 	return m
@@ -132,7 +132,7 @@ func onPR(t *testing.T, m Model, number int) Model {
 			m.ensureVisible()
 			if m.gh != nil {
 				(&m).requestDetails()
-				return loadDetails(t, m, m.gh)
+				return loadDetails(t, m)
 			}
 			return m
 		}

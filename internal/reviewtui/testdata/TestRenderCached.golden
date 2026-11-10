@@ -5,7 +5,7 @@
  │  ╭ mkowalski · stack #307 · 6 PRs on main                                  3 for you · start at #303 ││ gateway/slog → main                                  │
  │  │ ○ #306  Document the invoice lifecycle                    draft             ✓    +96    -3        ││ +1840 -220 · 24 files · 9 commits                    │
  │  │ ● #305  Post invoices to the ledger when they are final…  review            ●   +198   -14     1d ││ observability · needs-design                         │
- │  │ ● #304  Serve invoices over the billing API               review            ✗   +536   -61     1d ││                                                      │
+ │  │ ● #304  Serve invoices over the billing API               review            ✗   +536   -31     1d ││                                                      │
  │  │ ● #303  Model invoices and line items                     re-review  ✓1     ✓   +412   -38     3h ││ ── you ───────────────────────────────────────────── │
  │  │ ○ #302  Add the invoices schema migration                 approved   ✓1     ✓    +84              ││ review                                               │
  │  │ ✓ #301  Extract a money package                           merged                +310  -122        ││ elena-v asked platform · 2d ago                      │

@@ -5,7 +5,7 @@
  │  ╭ mkowalski · stack #307 · 6 PRs on main                                                  3 for you · start at #303 │
  │  │ ○ #306  Document the invoice lifecycle                          draft                       ✓    +96    -3        │
  │  │ ● #305  Post invoices to the ledger when they are finalized     review     go               ●   +198   -14     1d │
- │  │ ● #304  Serve invoices over the billing API                     review     api go           ✗   +536   -61     1d │
+ │  │ ● #304  Serve invoices over the billing API                     review     api go           ✗   +322    -1     1d │
  │  │ ● #303  Model invoices and line items                           re-review  go        ✓1     ✓   +412   -38     3h │
  │  │ ○ #302  Add the invoices schema migration                       approved             ✓1     ✓    +84              │
  │  │ ✓ #301  Extract a money package                                 merged                          +310  -122        │
@@ -18,7 +18,7 @@
  │  ╭ tobiasr · stack #342 · 10 PRs on main                                                   2 for you · start at #337 │
  │  │ ┊ 3 PRs  1 in review · 2 draft                                                                                    │
  │  │ ● #338  Paginate search results with cursors                    review     api              ✓   +164   -40     7h │
- │▎ │ ● #337  Search users by name and email                          review     api       ✓1     ✓   +287   -12     7h │
+ │▎ │ ● #337  Search users by name and email                          review     api       ✓1     ✓   +166   -12     7h │
  │  │ ┊ 5 PRs  1 approved · 4 merged                                                                                    │
  │  ╰ main                                                                                                              │
  │                                                                                                                      │

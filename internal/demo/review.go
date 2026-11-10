@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -58,6 +59,21 @@ func (r *ReviewRemote) FetchReviewDetails(
 		}
 	}
 	return out, nil
+}
+
+// Checkout is the made-up checkout the demo's reviews run in. It implements
+// the review TUI's Local.
+type Checkout struct{}
+
+// Generated takes the protobuf code for generated.
+func (Checkout) Generated(paths []string) map[string]struct{} {
+	gen := map[string]struct{}{}
+	for _, p := range paths {
+		if strings.HasSuffix(p, ".pb.go") {
+			gen[p] = struct{}{}
+		}
+	}
+	return gen
 }
 
 // Queue is the demo review queue, with times relative to now.
@@ -283,6 +299,20 @@ func Queue(now time.Time) *github.Queue {
 				Login: Viewer, State: "APPROVED", At: ago(3 * day), Commit: sha(312),
 			},
 		}),
+	}
+	// A PR's totals are those of its files, generated ones included, as
+	// GitHub counts them. #325 changes more files than its details list.
+	for n, d := range Details(now) {
+		for _, p := range prs {
+			if p.Number != n || n == 325 {
+				continue
+			}
+			p.ChangedFiles, p.Additions, p.Deletions = len(d.Files), 0, 0
+			for _, f := range d.Files {
+				p.Additions += f.Additions
+				p.Deletions += f.Deletions
+			}
+		}
 	}
 	// The requested PRs come first, as GitHub's search returns them.
 	slices.SortStableFunc(prs, func(a, b *github.ReviewPR) int {

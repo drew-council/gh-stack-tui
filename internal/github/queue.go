@@ -132,7 +132,8 @@ func (pr *ReviewPR) Version() string {
 type ReviewDetail struct {
 	Number int
 	// Body is the description, in Markdown, cut to maxBody.
-	Body  string
+	Body string
+	// Files are the files the PR changes, up to maxFiles of them.
 	Files []ChangedFile
 	// Commits are the latest commits, newest first.
 	Commits        []PRCommit
@@ -147,6 +148,9 @@ type ChangedFile struct {
 	Status    string // A, M, D, R, C
 	Additions int
 	Deletions int
+	// Generated is not GitHub's to say: whoever has a checkout sets it, from
+	// the checkout's .gitattributes.
+	Generated bool
 }
 
 // PRCommit is one commit of a pull request.
@@ -628,9 +632,17 @@ func (c *Client) listStacks(ctx context.Context) ([]Stack, error) {
 	return out, nil
 }
 
+// fileFields requests one page of a PR's files.
+const fileFields = `pageInfo { hasNextPage endCursor }
+    nodes { path additions deletions changeType }`
+
+// maxFiles is the most files fetched for one PR. A PR with more shows
+// GitHub's line counts, which cannot leave generated files out.
+const maxFiles = 1000
+
 // detailFields requests what [ReviewDetail] holds.
 const detailFields = `number body
-  files(first: 100) { nodes { path additions deletions changeType } }
+  files(first: 100) { ` + fileFields + ` }
   reviewThreads(first: 100) { nodes { isResolved
     comments(first: 1) { nodes { author { __typename login } } } } }
   recent: commits(last: 30) { nodes { commit { oid messageHeadline committedDate } } }
@@ -644,15 +656,8 @@ const detailFields = `number body
 type detailNode struct {
 	// prNode's review threads and check contexts.
 	prNode
-	Body  string `json:"body"`
-	Files struct {
-		Nodes []struct {
-			Path       string `json:"path"`
-			Additions  int    `json:"additions"`
-			Deletions  int    `json:"deletions"`
-			ChangeType string `json:"changeType"`
-		} `json:"nodes"`
-	} `json:"files"`
+	Body   string    `json:"body"`
+	Files  filesNode `json:"files"`
 	Recent struct {
 		Nodes []struct {
 			Commit struct {
@@ -662,6 +667,31 @@ type detailNode struct {
 			} `json:"commit"`
 		} `json:"nodes"`
 	} `json:"recent"`
+}
+
+// filesNode is one page of a PR's files.
+type filesNode struct {
+	PageInfo struct {
+		HasNextPage bool   `json:"hasNextPage"`
+		EndCursor   string `json:"endCursor"`
+	} `json:"pageInfo"`
+	Nodes []struct {
+		Path       string `json:"path"`
+		Additions  int    `json:"additions"`
+		Deletions  int    `json:"deletions"`
+		ChangeType string `json:"changeType"`
+	} `json:"nodes"`
+}
+
+func (n filesNode) files() []ChangedFile {
+	var out []ChangedFile
+	for _, f := range n.Nodes {
+		out = append(out, ChangedFile{
+			Path: f.Path, Status: changeStatus(f.ChangeType),
+			Additions: f.Additions, Deletions: f.Deletions,
+		})
+	}
+	return out
 }
 
 // changeStatus is the letter git shows for a GraphQL PatchStatus.
@@ -691,12 +721,7 @@ func (n *detailNode) toDetail() *ReviewDetail {
 	if r := []rune(d.Body); len(r) > maxBody {
 		d.Body = string(r[:maxBody]) + "…"
 	}
-	for _, f := range n.Files.Nodes {
-		d.Files = append(d.Files, ChangedFile{
-			Path: f.Path, Status: changeStatus(f.ChangeType),
-			Additions: f.Additions, Deletions: f.Deletions,
-		})
-	}
+	d.Files = n.Files.files()
 	for _, c := range slices.Backward(n.Recent.Nodes) {
 		d.Commits = append(d.Commits, PRCommit{
 			SHA: c.Commit.OID, Subject: c.Commit.MessageHeadline, Time: c.Commit.CommittedDate,
@@ -730,21 +755,72 @@ func (c *Client) FetchReviewDetails(
 		if err != nil && (!partial(err) || data.Repository == nil) {
 			return err
 		}
-		mu.Lock()
-		defer mu.Unlock()
 		for _, raw := range data.Repository {
 			var node *detailNode
 			if err := json.Unmarshal(raw, &node); err != nil {
 				return err
 			}
-			if node != nil {
-				out[node.Number] = node.toDetail()
+			if node == nil {
+				continue
 			}
+			d := node.toDetail()
+			if info := node.Files.PageInfo; info.HasNextPage {
+				more, err := c.moreFiles(ctx, node.Number, info.EndCursor, maxFiles-len(d.Files))
+				if err != nil {
+					return err
+				}
+				d.Files = append(d.Files, more...)
+			}
+			mu.Lock()
+			out[node.Number] = d
+			mu.Unlock()
 		}
 		return nil
 	})
 	if err != nil {
 		return nil, err
+	}
+	return out, nil
+}
+
+const moreFilesQuery = `query($owner: String!, $name: String!, $number: Int!, $after: String!) {
+  repository(owner: $owner, name: $name) { pullRequest(number: $number) {
+    files(first: 100, after: $after) { ` + fileFields + ` }
+  } }
+}`
+
+// moreFiles returns the files of PR number after cursor, at most limit of
+// them and a page or so more.
+func (c *Client) moreFiles(
+	ctx context.Context,
+	number int,
+	cursor string,
+	limit int,
+) ([]ChangedFile, error) {
+	var out []ChangedFile
+	for len(out) < limit {
+		var data struct {
+			Repository *struct {
+				PullRequest *struct {
+					Files filesNode `json:"files"`
+				} `json:"pullRequest"`
+			} `json:"repository"`
+		}
+		vars := map[string]any{
+			"owner": c.Repo.Owner, "name": c.Repo.Name, "number": number, "after": cursor,
+		}
+		if err := c.graphQLRetry(ctx, moreFilesQuery, vars, &data); err != nil {
+			return nil, err
+		}
+		if data.Repository == nil || data.Repository.PullRequest == nil {
+			break
+		}
+		page := data.Repository.PullRequest.Files
+		out = append(out, page.files()...)
+		if !page.PageInfo.HasNextPage {
+			break
+		}
+		cursor = page.PageInfo.EndCursor
 	}
 	return out, nil
 }

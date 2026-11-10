@@ -6,7 +6,7 @@
  │  ╭ mkowalski · stack #307 · 6 PRs on main                                  3 for you · start at #303 ││ gateway/slog → main                                  │
  │  │ ○ #306  Document the invoice lifecycle                    draft             ✓    +96    -3        ││ +1840 -220 · 24 files · 9 commits                    │
  │  │ ● #305  Post invoices to the ledger when they are final…  review            ●   +198   -14     1d ││ observability · needs-design                         │
- │  │ ● #304  Serve invoices over the billing API               review            ✗   +536   -61     1d ││                                                      │
+ │  │ ● #304  Serve invoices over the billing API               review            ✗   +322    -1     1d ││                                                      │
  │  │ ● #303  Model invoices and line items                     re-review  ✓1     ✓   +412   -38     3h ││ ── you ───────────────────────────────────────────── │
  │  │ ○ #302  Add the invoices schema migration                 approved   ✓1     ✓    +84              ││ review                                               │
  │  │ ✓ #301  Extract a money package                           merged                +310  -122        ││ elena-v asked platform · 2d ago                      │
@@ -19,7 +19,7 @@
  │  ╭ tobiasr · stack #342 · 10 PRs on main                                   2 for you · start at #337 ││                                                      │
  │  │ ┊ 3 PRs  1 in review · 2 draft                                                                    ││ Every request logs once, with the route, the caller, │
  │  │ ● #338  Paginate search results with cursors              review            ✓   +164   -40     7h ││ the status, and how long it took. Handlers add       │
- │▎ │ ● #337  Search users by name and email                    review     ✓1     ✓   +287   -12     7h ││ attributes to the request's logger instead of        │
+ │▎ │ ● #337  Search users by name and email                    review     ✓1     ✓   +166   -12     7h ││ attributes to the request's logger instead of        │
  │  │ ┊ 5 PRs  1 approved · 4 merged                                                                    ││ writing lines of their own.                          │
  │  ╰ main                                                                                              ││                                                      │
  │                                                                                                      ││ Large because it touches every handler. The first    │

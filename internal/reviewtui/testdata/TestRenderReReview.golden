@@ -3,9 +3,9 @@
  │    ● #325  Add structured logging to the gateway                      elena-v  review     platform         ✓  +1840  -220     2d ││ Model invoices and line items                                    │
  │                                                                                                                                  ││  OPEN  mkowalski · opened 4d ago · pushed 4h ago                 │
  │  ╭ mkowalski · stack #307 · 6 PRs on main                                                              3 for you · start at #303 ││ billing/model → billing/schema                                   │
- │  │ ○ #306  Document the invoice lifecycle                                      draft                       ✓    +96    -3        ││ +412 -38 · 7 files · 5 commits                                   │
+ │  │ ○ #306  Document the invoice lifecycle                                      draft                       ✓    +96    -3        ││ +412 -38 · 5 files · 5 commits                                   │
  │  │ ● #305  Post invoices to the ledger when they are finalized                 review     go               ●   +198   -14     1d ││                                                                  │
- │  │ ● #304  Serve invoices over the billing API                                 review     api go           ✗   +536   -61     1d ││ ── you ───────────────────────────────────────────────────────── │
+ │  │ ● #304  Serve invoices over the billing API                                 review     api go           ✗   +322    -1     1d ││ ── you ───────────────────────────────────────────────────────── │
 █│  │ ● #303  Model invoices and line items                                       re-review  go        ✓1     ✓   +412   -38     3h ││ re-review · asked again                                          │
  │  │ ○ #302  Add the invoices schema migration                                   approved             ✓1     ✓    +84              ││ mkowalski asked go-readability · 3h ago                          │
  │  │ ✓ #301  Extract a money package                                             merged                          +310  -122        ││ you requested changes 2d ago · 2 commits since                   │
@@ -18,7 +18,7 @@
  │  ╭ tobiasr · stack #342 · 10 PRs on main                                                               2 for you · start at #337 ││ 2 unresolved threads                                             │
  │  │ ┊ 3 PRs  1 in review · 2 draft                                                                                                ││                                                                  │
  │  │ ● #338  Paginate search results with cursors                                review     api              ✓   +164   -40     7h ││ ── stack #307 · 3 of 6 ───────────────────────────────────────── │
- │▎ │ ● #337  Search users by name and email                                      review     api       ✓1     ✓   +287   -12     7h ││ ↑ #304 Serve invoices over the billing API                review │
+ │▎ │ ● #337  Search users by name and email                                      review     api       ✓1     ✓   +166   -12     7h ││ ↑ #304 Serve invoices over the billing API                review │
  │  │ ┊ 5 PRs  1 approved · 4 merged                                                                                                ││ ↓ #302 Add the invoices schema migration                approved │
  │  ╰ main                                                                                                                          ││                                                                  │
  │                                                                                                                                  ││ ── description ───────────────────────────────────────────────── │
@@ -33,13 +33,13 @@
  │                                                                                                                                  ││ line, and the currency is checked when an item is added rather   │
  │                                                                                                                                  ││ than at finalize.                                                │
  │                                                                                                                                  ││                                                                  │
- │                                                                                                                                  ││ ── 7 files ───────────────────────────────────────────────────── │
+ │                                                                                                                                  ││ ── 5 files ───────────────────────────────────────────────────── │
  │                                                                                                                                  ││ A internal/billing/invoice.go                               +148 │
  │                                                                                                                                  ││ A internal/billing/invoice_test.go                          +163 │
  │                                                                                                                                  ││ A internal/billing/lineitem.go                               +62 │
  │                                                                                                                                  ││ M internal/billing/money/money.go                         +21 -9 │
  │                                                                                                                                  ││ M internal/billing/store.go                              +18 -29 │
- │                                                                                                                                  ││ … 2 more                                                         │
+ │                                                                                                                                  ││                                                                  │
  │                                                                                                                                  ││                                                                  │
  │                                                                                                                                  ││                                                                  │
  │                                                                                                                                  ││                                                                  │

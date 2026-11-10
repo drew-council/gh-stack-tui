@@ -127,7 +127,7 @@ A pull request outside any stack whose base is not trunk starts with `on #12`, t
 | `VIA` | who was asked: `you` by name, else your teams, without the part of their names they share |
 | `REVS` | other reviewers: `✓1` approved, `✗1` requested changes |
 | `CI` | `✓` passed, `✗` failed, `●` running, `⊘` cancelled |
-| `DIFF` | lines added and deleted |
+| `DIFF` | lines added and deleted, without generated files |
 | `ASKED` | how long ago you were asked, in peach after three days |
 
 | `YOU` | Meaning |
@@ -137,6 +137,8 @@ A pull request outside any stack whose base is not trunk starts with `on #12`, t
 | `waiting` | you commented or requested changes and nothing changed since: the author's turn |
 | `approved` | you approved |
 | `draft`, `bot`, `merged`, `closed` | the pull request's own state |
+
+Line and file counts leave out generated files, the ones your checkout's `.gitattributes` tags `linguist-generated`, `gitlab-generated`, or `generated`, as `ghst` does. A pull request shows GitHub's totals until its files have loaded, and keeps them when it changes more than 1000 files.
 
 A `▎` in the first column marks a pull request that a tab is reviewing. Mauve means selected, as in `ghst`.
 

@@ -611,14 +611,7 @@ func (m Model) sections(bi int) []section {
 				n++
 			}
 		}
-		label := ui.Plural(n, "file", "files")
-		switch gen := len(b.Files) - n; {
-		case n == 0:
-			label = ui.Plural(gen, "generated file", "generated files")
-		case gen > 0:
-			label += fmt.Sprintf(" + %d generated", gen)
-		}
-		out = append(out, section{secFiles, label})
+		out = append(out, section{secFiles, ui.FilesLabel(n, len(b.Files)-n)})
 	}
 	if len(b.Commits) > 0 {
 		out = append(out, section{secCommits, ui.Plural(len(b.Commits), "commit", "commits")})

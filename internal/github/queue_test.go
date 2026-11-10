@@ -302,6 +302,36 @@ func TestFetchReviewDetails(t *testing.T) {
 	}
 }
 
+// A PR with more files than one page holds is asked for the rest.
+func TestFetchReviewDetailsPagesFiles(t *testing.T) {
+	page := func(path string, more bool, cursor string) string {
+		return fmt.Sprintf(`{"pageInfo": {"hasNextPage": %v, "endCursor": %q},
+			"nodes": [{"path": %q, "additions": 1, "changeType": "ADDED"}]}`, more, cursor, path)
+	}
+	fake := &fakeGitHub{route: func(request string) (int, string, bool) {
+		rest := `{"data": {"repository": {"pullRequest": {"files": %s}}}}`
+		switch {
+		case strings.Contains(request, `"after":"c1"`):
+			return 200, fmt.Sprintf(rest, page("b.go", true, "c2")), true
+		case strings.Contains(request, `"after":"c2"`):
+			return 200, fmt.Sprintf(rest, page("c.go", false, "")), true
+		}
+		return 200, `{"data": {"repository": {"d0": {"number": 7, "files": ` +
+			page("a.go", true, "c1") + `}}}}`, true
+	}}
+	got, err := fakeClient(t, fake).FetchReviewDetails(context.Background(), []int{7})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var paths []string
+	for _, f := range got[7].Files {
+		paths = append(paths, f.Path)
+	}
+	if !slices.Equal(paths, []string{"a.go", "b.go", "c.go"}) || len(fake.requests) != 3 {
+		t.Fatalf("files %v after %d requests", paths, len(fake.requests))
+	}
+}
+
 func TestFetchReviewDetailsCutsLongBodies(t *testing.T) {
 	body := strings.Repeat("é", maxBody+10)
 	fake := &fakeGitHub{status: 200, body: fmt.Sprintf(

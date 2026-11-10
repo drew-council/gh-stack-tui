@@ -187,6 +187,18 @@ func Plural(n int, one, many string) string {
 	return fmt.Sprintf("%d %s", n, many)
 }
 
+// FilesLabel counts changed files, the generated ones apart: "5 files + 1
+// generated".
+func FilesLabel(written, generated int) string {
+	switch {
+	case written == 0 && generated > 0:
+		return Plural(generated, "generated file", "generated files")
+	case generated > 0:
+		return Plural(written, "file", "files") + fmt.Sprintf(" + %d generated", generated)
+	}
+	return Plural(written, "file", "files")
+}
+
 // TruncateLeft keeps the tail of a path, which is the distinctive part.
 func TruncateLeft(s string, maxLen int) string {
 	maxLen = max(20, maxLen)

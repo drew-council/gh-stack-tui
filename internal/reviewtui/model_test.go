@@ -393,3 +393,41 @@ func TestMarkdownReadsAsText(t *testing.T) {
 		t.Fatalf("got:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 }
+
+// prOf returns PR number of the queue.
+func prOf(t *testing.T, m Model, number int) *github.ReviewPR {
+	t.Helper()
+	it, ok := m.find(number)
+	if !ok || it.PR == nil {
+		t.Fatalf("#%d is not in the queue", number)
+	}
+	return it.PR
+}
+
+func TestSizeLeavesOutGeneratedFiles(t *testing.T) {
+	m := demoModel(t, 200, 50)
+	if got, want := m.size(
+		prOf(t, m, 304),
+	), (size{add: 322, del: 1, files: 4, generated: 1}); got != want {
+		t.Fatalf("#304 is %+v, want %+v", got, want)
+	}
+	// #325 changes more files than were fetched, so nothing can be left out.
+	if got, want := m.size(prOf(t, m, 325)), (size{add: 1840, del: 220, files: 24}); got != want {
+		t.Fatalf("#325 is %+v, want %+v", got, want)
+	}
+	// Until a PR's files are loaded, GitHub's totals stand in.
+	delete(m.details, 304)
+	if got, want := m.size(prOf(t, m, 304)), (size{add: 536, del: 31, files: 5}); got != want {
+		t.Fatalf("#304 without details is %+v, want %+v", got, want)
+	}
+}
+
+// Without a checkout to ask, every file counts.
+func TestSizeCountsEveryFileWithoutCheckout(t *testing.T) {
+	m, remote := newDemo(t, 200, 50)
+	m.opts.Local = nil
+	m = refresh(t, m, remote, time.Second)
+	if got, want := m.size(prOf(t, m, 304)), (size{add: 536, del: 31, files: 5}); got != want {
+		t.Fatalf("#304 is %+v, want %+v", got, want)
+	}
+}

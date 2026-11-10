@@ -118,11 +118,12 @@ func (m Model) prDetail(g review.Group, idx, w int) []string {
 			s.Dim.Render(ui.TruncateLeft(pr.HeadRef, w)),
 			s.Dim.Render("→ ")+s.Normal.Render(ui.TruncateLeft(pr.BaseRef, w-2)))
 	}
+	size := m.size(pr)
 	stats := []string{
-		ui.Plural(pr.ChangedFiles, "file", "files"), ui.Plural(pr.Commits, "commit", "commits"),
+		ui.FilesLabel(size.files, size.generated), ui.Plural(pr.Commits, "commit", "commits"),
 	}
 	line := s.Dim.Render(strings.Join(stats, " · "))
-	if d := s.DiffStat(pr.Additions, pr.Deletions); d != "" {
+	if d := s.DiffStat(size.add, size.del); d != "" {
 		line = d + s.Dim.Render(" · ") + line
 	}
 	if pr.Conflicts {
@@ -186,15 +187,30 @@ func (m Model) prDetail(g review.Group, idx, w int) []string {
 	if loaded && len(d.Files) == 0 {
 		return out
 	}
-	out = append(out, "", m.rule(ui.Plural(pr.ChangedFiles, "file", "files"), w))
+	out = append(out, "", m.rule(ui.FilesLabel(size.files, size.generated), w))
 	if !loaded {
 		return append(out, m.pending(pr))
 	}
+	// Generated files are counted, not listed: nobody reviews them.
+	gen, genAdd, genDel := 0, 0, 0
 	for _, f := range d.Files {
+		if f.Generated {
+			gen++
+			genAdd += f.Additions
+			genDel += f.Deletions
+			continue
+		}
 		stat := s.DiffStat(f.Additions, f.Deletions)
 		room := w - 2 - lipgloss.Width(stat) - 3
 		out = append(out, ui.Fit(
 			m.fileStatus(f.Status)+" "+s.Normal.Render(ui.TruncateLeft(f.Path, room)), stat, w+1,
+		))
+	}
+	if gen > 0 {
+		stat := strings.TrimSpace(fmt.Sprintf("+%d -%d", genAdd, genDel))
+		out = append(out, ui.Fit(
+			s.Subtle.Render("  "+ui.Plural(gen, "generated file", "generated files")),
+			s.Subtle.Render(stat), w+1,
 		))
 	}
 	if more := pr.ChangedFiles - len(d.Files); more > 0 {
@@ -484,10 +500,11 @@ func (m Model) stackDetail(g review.Group, items []review.Item, w int) []string 
 	n, add, del, files := 0, 0, 0, 0
 	for _, it := range items {
 		if it.ForYou() {
+			size := m.size(it.PR)
 			n++
-			add += it.PR.Additions
-			del += it.PR.Deletions
-			files += it.PR.ChangedFiles
+			add += size.add
+			del += size.del
+			files += size.files
 		}
 	}
 	if n > 0 {
