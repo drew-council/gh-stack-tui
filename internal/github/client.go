@@ -19,6 +19,7 @@ type Client struct {
 	Repo Repo
 	gql  *api.GraphQLClient
 	rest *api.RESTClient
+	id   identity
 }
 
 // NewClient returns a client for repo, authenticated as the gh CLI's user.

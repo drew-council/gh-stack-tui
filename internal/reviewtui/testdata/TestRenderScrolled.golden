@@ -1,0 +1,16 @@
+ ╭─ Review queue · acme/auth-service ──────────────────────── 8 to review · 1 to re-review · ↻ 12s ago ─╮╭─ #338 ───────────────────────────────────────────────╮
+ │      PR    TITLE                                    AUTHOR   YOU        REVS   CI        DIFF  ASKED ││ search/pagination → search/user-query                │
+ │  ╰ main                                                                                              ││ +164 -40 · 4 files · 2 commits                       │
+ │                                                                                                      ││                                                      │
+ │    ● #318  Cache team membership lookups for a mi…  priya-n  review     ✓1 ✗1  ✓   +143   -27     4d ││ ── you ───────────────────────────────────────────── │
+ │    ● #322  Fix the flaky session expiry test        priya-n  review            ✓    +12    -4    40m ││ review                                               │
+ │    ● #324  on #318 Drop cached teams when a user …  priya-n  review            ✓    +58    -9    19h ││ tobiasr asked api-readability · 7h ago               │
+ │                                                                                                      ││                                                      │
+ │  ╭ tobiasr · stack #342 · 10 PRs on main                                   2 for you · start at #337 ││ ── checks ────────────────────────────────────────── │
+ │  │ ┊ 3 PRs  1 in review · 2 draft                                                                    ││ 4 passed                                             │
+█│  │ ● #338  Paginate search results with cursors              review            ✓   +164   -40     7h ││                                                      │
+ │▎ │ ● #337  Search users by name and email                    review     ✓1     ✓   +166   -12     7h ││ ── stack #342 · 7 of 10 ──────────────────────────── │
+ │  │ ┊ 5 PRs  1 approved · 4 merged                                                                    ││ ↑ #339 Highlight the matched text          in review │
+ │  ╰ main                                                                                              ││ ↓ #337 Search users by name and email         review │
+ ╰────────────────────────────────────────────── hidden: 1 draft · 1 bot · 1 waiting · 1 approved · ↑9 ─╯╰───────────────────────────────────────────── ↑3 ↓11 ─╯
+  j/k move  enter review in a demo tab  space mark  o browser  y copy URL  J/K scroll details  [ ] groups  . hidden  / filter  ? help

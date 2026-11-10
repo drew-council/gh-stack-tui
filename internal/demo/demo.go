@@ -1,5 +1,6 @@
-// Package demo is a made-up repository with two stacks and pull requests in
-// every state the TUI renders. It backs ghst demo and the TUI's rendering
+// Package demo is a made-up repository: two stacks with pull requests in
+// every state ghst renders, and a review queue with pull requests in every
+// state ghrv renders. It backs ghst demo, ghrv demo, and the TUIs' rendering
 // tests.
 package demo
 

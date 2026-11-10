@@ -190,15 +190,29 @@ func (r *Repo) Diff(base, head string) ([]FileChange, error) {
 	return files, nil
 }
 
-// markGenerated checks .gitattributes for each file and sets Generated on
-// files tagged with linguist-generated, gitlab-generated, or generated.
+// markGenerated sets Generated on the files that [Repo.Generated] reports.
 func (r *Repo) markGenerated(files []FileChange) {
-	if len(files) == 0 {
-		return
+	paths := make([]string, len(files))
+	for i, f := range files {
+		paths[i] = f.Path
+	}
+	gen := r.Generated(paths)
+	for i := range files {
+		_, files[i].Generated = gen[files[i].Path]
+	}
+}
+
+// Generated returns the paths that the checkout's .gitattributes tags with
+// linguist-generated, gitlab-generated, or generated. The files need not
+// exist. It returns nothing when git fails.
+func (r *Repo) Generated(paths []string) map[string]struct{} {
+	gen := map[string]struct{}{}
+	if len(paths) == 0 {
+		return gen
 	}
 	var stdin strings.Builder
-	for _, f := range files {
-		stdin.WriteString(f.Path)
+	for _, p := range paths {
+		stdin.WriteString(p)
 		stdin.WriteByte(0)
 	}
 	out, err := r.outputStdin(
@@ -207,18 +221,15 @@ func (r *Repo) markGenerated(files []FileChange) {
 		"linguist-generated", "gitlab-generated", "generated",
 	)
 	if err != nil {
-		return
+		return gen
 	}
-	gen := map[string]bool{}
 	fields := strings.Split(strings.TrimSuffix(out, "\x00"), "\x00")
 	for i := 0; i+2 < len(fields); i += 3 {
 		if val := fields[i+2]; val == "set" || val == "true" {
-			gen[fields[i]] = true
+			gen[fields[i]] = struct{}{}
 		}
 	}
-	for i := range files {
-		files[i].Generated = gen[files[i].Path]
-	}
+	return gen
 }
 
 // Fingerprint returns a cheap summary of the local state that changes whenever

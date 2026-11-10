@@ -1,0 +1,469 @@
+package stacktui
+
+import (
+	"bufio"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"slices"
+	"strings"
+	"time"
+
+	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
+
+	"github.com/drew-council/gh-stack-tui/internal/desktop"
+	"github.com/drew-council/gh-stack-tui/internal/ui"
+)
+
+// --- background commands with streamed output ---
+
+type opStatus int
+
+const (
+	opRunning opStatus = iota
+	opSucceeded
+	opFailed
+	opCancelled
+)
+
+type opState struct {
+	title   string
+	started time.Time
+	// quiet ops hide the output panel again when they succeed.
+	quiet bool
+	// cancel interrupts a background op; nil for interactive ones.
+	cancel    context.CancelFunc
+	cancelled bool
+}
+
+// cancelWait is how long a cancelled op gets to exit after the interrupt
+// before it is killed.
+const cancelWait = 5 * time.Second
+
+type (
+	opLineMsg struct {
+		line string
+		ch   <-chan tea.Msg
+	}
+	opDoneMsg struct {
+		title    string
+		err      error
+		exitCode int
+	}
+	execDoneMsg struct {
+		what string
+		err  error
+	}
+)
+
+// maxOutput bounds the output panel's scrollback.
+const maxOutput = 500
+
+// pendingOp is a command waiting for the running one to finish.
+type pendingOp struct {
+	title string
+	name  string
+	args  []string
+	quiet bool
+	// interactive commands suspend the TUI and run in the terminal; what
+	// names them in the flash when they finish, if set.
+	interactive bool
+	what        string
+	// stack, when set, holds the branches of the stack shown when the op was
+	// queued; it only starts if one of them is still checked out.
+	stack []string
+}
+
+// runOp runs a command in the background, streaming its combined output into
+// the output panel. Stdin is closed, so gh stack takes its non-interactive
+// paths instead of prompting.
+func (m *Model) runOp(title string, name string, args ...string) tea.Cmd {
+	return m.enqueue(pendingOp{title: title, name: name, args: args})
+}
+
+// runQuietOp is runOp, but the output panel hides again on success.
+func (m *Model) runQuietOp(title string, name string, args ...string) tea.Cmd {
+	return m.enqueue(pendingOp{title: title, name: name, args: args, quiet: true})
+}
+
+// enqueue starts p, or queues it behind the running command. The queue runs in
+// order and is dropped when a command fails.
+func (m *Model) enqueue(p pendingOp) tea.Cmd {
+	if m.op != nil {
+		m.queue = append(m.queue, p)
+		return m.setFlash("queued "+p.title, false)
+	}
+	return m.start(p)
+}
+
+// next starts the first queued command, if any.
+func (m *Model) next() tea.Cmd {
+	if len(m.queue) == 0 {
+		return nil
+	}
+	p := m.queue[0]
+	m.queue = m.queue[1:]
+	if p.stack != nil && !slices.Contains(p.stack, m.local.CurrentBranch()) {
+		m.queue = nil
+		return m.notCurrentFlash()
+	}
+	return m.start(p)
+}
+
+// cancelOp interrupts the running op and drops the queue. It reports false
+// when there is nothing to cancel.
+func (m *Model) cancelOp() bool {
+	if m.op == nil || m.op.cancel == nil || m.op.cancelled {
+		return false
+	}
+	m.queue = nil
+	m.op.cancelled = true
+	m.op.cancel()
+	return true
+}
+
+func (m *Model) start(p pendingOp) tea.Cmd {
+	m.op = &opState{title: p.title, started: m.now(), quiet: p.quiet}
+	if p.interactive {
+		cmd := exec.Command(p.name, p.args...)
+		cmd.Dir = m.local.Dir()
+		return tea.ExecProcess(
+			cmd,
+			func(err error) tea.Msg { return execDoneMsg{what: p.what, err: err} },
+		)
+	}
+	title, name, args := p.title, p.name, p.args
+	m.output = []string{"$ " + name + " " + strings.Join(args, " ")}
+	m.outputTitle = title
+	m.outputState = opRunning
+	m.showOutput = true
+
+	ctx, cancel := context.WithCancel(context.Background())
+	m.op.cancel = cancel
+	cmd := exec.CommandContext(ctx, name, args...)
+	cmd.Dir = m.local.Dir()
+	cmd.Env = append(
+		os.Environ(),
+		"GH_PROMPT_DISABLED=1",
+		"NO_COLOR=1",
+		"GIT_TERMINAL_PROMPT=0",
+	)
+	detach(cmd)
+	cmd.Cancel = func() error { return interrupt(cmd) }
+	cmd.WaitDelay = cancelWait
+
+	ch := make(chan tea.Msg, 64)
+	go func() {
+		defer close(ch)
+		defer cancel()
+		pr, pw := io.Pipe()
+		cmd.Stdout = pw
+		cmd.Stderr = pw
+		if err := cmd.Start(); err != nil {
+			ch <- opDoneMsg{title: title, err: err, exitCode: -1}
+			return
+		}
+		go func() {
+			err := cmd.Wait()
+			pw.CloseWithError(err)
+		}()
+		sc := bufio.NewScanner(pr)
+		sc.Buffer(make([]byte, 64*1024), 1024*1024)
+		for sc.Scan() {
+			ch <- opLineMsg{line: sc.Text(), ch: ch}
+		}
+		err := sc.Err()
+		code := 0
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			code = exitErr.ExitCode()
+		} else if err != nil {
+			code = -1
+		}
+		ch <- opDoneMsg{title: title, err: err, exitCode: code}
+	}()
+	return waitOp(ch)
+}
+
+func waitOp(ch <-chan tea.Msg) tea.Cmd {
+	return func() tea.Msg {
+		msg, ok := <-ch
+		if !ok {
+			return nil
+		}
+		return msg
+	}
+}
+
+func (m *Model) appendOutput(line string) {
+	// Progress output redraws with carriage returns; keep the final frame.
+	if i := strings.LastIndexByte(line, '\r'); i >= 0 {
+		line = line[i+1:]
+	}
+	m.output = append(m.output, ansi.Strip(line))
+	if len(m.output) > maxOutput {
+		m.output = m.output[len(m.output)-maxOutput:]
+	}
+}
+
+// exitHints explains gh stack's documented exit codes.
+var exitHints = map[int]string{
+	2:  "not in a stack",
+	3:  "rebase conflict: resolve, git add, then rc to continue or ra to abort",
+	4:  "GitHub API failure",
+	6:  "branch is in several stacks, check out a non-shared branch",
+	7:  "rebase already in progress: rc to continue or ra to abort",
+	8:  "stack file locked by another gh stack process, retry shortly",
+	9:  "stacked PRs are not enabled on this repository",
+	10: "modify recovery required: run gh stack modify --abort",
+}
+
+func (m Model) finishOp(msg opDoneMsg) (tea.Model, tea.Cmd) {
+	quiet := m.op != nil && m.op.quiet
+	cancelled := m.op != nil && m.op.cancelled
+	m.op = nil
+	var flash, next tea.Cmd
+	switch {
+	case cancelled:
+		m.outputState = opCancelled
+		flash = m.setNote(msg.title + " cancelled")
+	case msg.err != nil:
+		m.queue = nil
+		m.outputState = opFailed
+		text := msg.title + " failed"
+		if hint, ok := exitHints[msg.exitCode]; ok {
+			text += ": " + hint
+		} else if last := lastLine(m.output); last != "" {
+			text += ": " + last
+		}
+		m.appendOutput(fmt.Sprintf("[exit %d]", msg.exitCode))
+		flash = m.setFlash(text, true)
+	default:
+		m.outputState = opSucceeded
+		flash = m.setFlash(msg.title+" done", false)
+		if quiet {
+			m.showOutput = false
+		}
+		next = m.next()
+	}
+	return m, tea.Batch(flash, next, m.requestLocal(), m.requestRemote())
+}
+
+func (m Model) finishExec(msg execDoneMsg) (tea.Model, tea.Cmd) {
+	m.op = nil
+	var flash, next tea.Cmd
+	if msg.err != nil {
+		m.queue = nil
+		flash = m.setFlash(msg.what+": "+msg.err.Error(), true)
+	} else {
+		if msg.what != "" {
+			flash = m.setFlash(msg.what+" finished", false)
+		}
+		next = m.next()
+	}
+	return m, tea.Batch(flash, next, m.requestLocal(), m.requestRemote())
+}
+
+// lastLine picks the line that best explains a failure: gh stack prefixes
+// errors with ✗, and follows them with suggestions, so the last ✗ line wins
+// over the last line.
+func lastLine(lines []string) string {
+	for i := len(lines) - 1; i > 0; i-- {
+		if s := strings.TrimSpace(
+			lines[i],
+		); strings.HasPrefix(s, "✗") ||
+			strings.HasPrefix(s, "error") {
+			return s
+		}
+	}
+	for i := len(lines) - 1; i > 0; i-- {
+		if s := strings.TrimSpace(lines[i]); s != "" {
+			return s
+		}
+	}
+	return ""
+}
+
+// runInteractive suspends the TUI to run an interactive command in the
+// terminal, then resumes and refreshes. title names it while queued; what,
+// when set, names it in the flash once it finishes.
+func (m *Model) runInteractive(title, what string, name string, args ...string) tea.Cmd {
+	return m.enqueue(pendingOp{
+		title: title, name: name, args: args, interactive: true, what: what,
+	})
+}
+
+// --- browser ---
+
+// fileAnchor is GitHub's anchor for a file in a PR's "Files changed" tab.
+func fileAnchor(path string) string {
+	sum := sha256.Sum256([]byte(path))
+	return "#diff-" + hex.EncodeToString(sum[:])
+}
+
+// --- review ---
+
+// selectedBranches returns the branch indexes (bottom first) in the review
+// selection, or nil when nothing is marked or in the visual range.
+func (m *Model) selectedBranches() []int {
+	if !m.visual && len(m.marks) == 0 {
+		return nil
+	}
+	var sel []int
+	for i, b := range m.snap.Branches {
+		if m.isSelected(i, b.Name) {
+			sel = append(sel, i)
+		}
+	}
+	return sel
+}
+
+// selectedBranchNames returns the names of the selected branches in stack
+// order, for copying one per line.
+func (m *Model) selectedBranchNames() []string {
+	var names []string
+	for _, i := range m.selectedBranches() {
+		names = append(names, m.snap.Branches[i].Name)
+	}
+	return names
+}
+
+// selectedFilePaths returns the changed file paths across the selected
+// branches, in branch order and without duplicates.
+func (m *Model) selectedFilePaths() []string {
+	var paths []string
+	seen := map[string]bool{}
+	for _, i := range m.selectedBranches() {
+		for _, f := range m.snap.Branches[i].Files {
+			if !seen[f.Path] {
+				seen[f.Path] = true
+				paths = append(paths, f.Path)
+			}
+		}
+	}
+	return paths
+}
+
+// reviewSelection returns the branch indexes (bottom first) to review: the
+// visual range, else the marked branches, else the hovered branch.
+func (m *Model) reviewSelection() []int {
+	if sel := m.selectedBranches(); len(sel) > 0 {
+		return sel
+	}
+	if bi := m.hoveredBranch(); bi >= 0 {
+		return []int{bi}
+	}
+	return nil
+}
+
+// isSelected reports whether branch i is marked or inside the visual range.
+func (m *Model) isSelected(i int, name string) bool {
+	if m.marks[name] {
+		return true
+	}
+	if !m.visual {
+		return false
+	}
+	bi := m.hoveredBranch()
+	if bi < 0 {
+		return false
+	}
+	a := m.snap.IndexOf(m.anchor)
+	if a < 0 {
+		return false
+	}
+	lo, hi := min(a, bi), max(a, bi)
+	return i >= lo && i <= hi
+}
+
+// reviewRange turns a selection into a single base..head range. The stack is
+// linear, so a non-contiguous selection also covers the layers in between.
+func (m *Model) reviewRange(sel []int) (rng string, gap bool, err error) {
+	bottom, top := m.snap.Branches[sel[0]], m.snap.Branches[sel[len(sel)-1]]
+	if bottom.DiffBase == "" || top.Head == "" {
+		return "", false, fmt.Errorf("%s is not available locally", bottom.Name)
+	}
+	gap = sel[len(sel)-1]-sel[0]+1 != len(sel)
+	return bottom.DiffBase + ".." + top.Head, gap, nil
+}
+
+// reviewPR returns the number of branch i's PR when it can be reviewed on
+// GitHub: open (draft or ready), from live data when loaded, else the stack file.
+func (m *Model) reviewPR(i int) int {
+	if pr := m.prFor(i); pr != nil {
+		if pr.State != "OPEN" || pr.Merged {
+			return 0
+		}
+		return pr.Number
+	}
+	return m.prNumber(i)
+}
+
+// reviewCommand builds the review command for a selection. A single branch
+// with an open PR (draft or ready) is reviewed as that PR, so comments can be
+// posted to it; anything else is reviewed as a commit range.
+func (m *Model) reviewCommand(sel []int) (command, note string, err error) {
+	if len(sel) == 1 && m.opts.ReviewPRCmd != "" {
+		if n := m.reviewPR(sel[0]); n > 0 {
+			return strings.ReplaceAll(m.opts.ReviewPRCmd, "{pr}", fmt.Sprint(n)), "", nil
+		}
+	}
+	rng, gap, err := m.reviewRange(sel)
+	if err != nil {
+		return "", "", err
+	}
+	if gap {
+		note = " (selection not contiguous, layers in between included)"
+	}
+	return strings.ReplaceAll(m.opts.ReviewCmd, "{range}", rng), note, nil
+}
+
+func (m *Model) startReview() tea.Cmd {
+	if m.snap == nil || len(m.snap.Branches) == 0 {
+		return nil
+	}
+	sel := m.reviewSelection()
+	if len(sel) == 0 {
+		return m.setFlash("nothing selected to review", true)
+	}
+	command, note, err := m.reviewCommand(sel)
+	if err != nil {
+		return m.setFlash("review: "+err.Error(), true)
+	}
+	var names []string
+	for _, i := range sel {
+		names = append(names, m.snap.Branches[i].Name)
+	}
+	label := "review " + shortBranch(names[len(names)-1])
+	if len(names) > 1 {
+		label = fmt.Sprintf("review %s +%d", shortBranch(names[len(names)-1]), len(names)-1)
+	}
+
+	m.clearSelection()
+
+	root := m.local.Dir()
+	tabs := desktop.NewTabs(desktop.TabTarget(m.opts.ReviewIn))
+	if tabs == nil {
+		return m.runInteractive(label, "", "sh", "-c", command)
+	}
+	return func() tea.Msg {
+		if _, err := tabs.Open(root, label, command, true); err != nil {
+			return ui.FlashMsg{Text: "review: " + err.Error(), Err: true}
+		}
+		return ui.FlashMsg{Text: "opened " + label + " in a new " + tabs.Noun() + note}
+	}
+}
+
+// shortBranch drops a leading "user/" style prefix for compact labels.
+func shortBranch(name string) string {
+	if _, rest, ok := strings.Cut(name, "/"); ok && rest != "" {
+		return rest
+	}
+	return name
+}
