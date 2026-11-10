@@ -36,10 +36,10 @@ func (m *Model) command(pr *github.ReviewPR) string {
 		Replace(m.opts.ReviewCmd)
 }
 
-// startReview opens the PRs under review. The hovered PR opens in a tab that
-// takes the focus, or its tab is focused when it has one. A selection, or a
-// stack's PRs, open in tabs behind the TUI, in the order to review them, so
-// the queue stays in front. Without tabs, reviews run here one after another.
+// startReview opens the PRs under review, each in a tab behind the TUI, in
+// the order to review them: the queue stays in front, to keep picking from.
+// Only a tab that is already open takes the focus: enter on its PR goes to
+// it. Without tabs, reviews run here one after another.
 func (m *Model) startReview() tea.Cmd {
 	if r, ok := m.hovered(); ok && r.kind == rowFold && len(m.selection()) == 0 {
 		m.expand()
@@ -95,7 +95,7 @@ func (m *Model) startReview() tea.Cmd {
 				msg.focused, msg.err = j.number, tabs.Focus(id)
 				return msg
 			}
-			id, err := tabs.Open(dir, tabLabel(j.number), j.command, !several)
+			id, err := tabs.Open(dir, tabLabel(j.number), j.command, false)
 			if err != nil {
 				msg.err = err
 				return msg
@@ -139,7 +139,7 @@ func (m Model) applyOpened(msg reviewOpenedMsg) (tea.Model, tea.Cmd) {
 			ui.Plural(msg.skipped, "PR already has", "PRs already have") + " a " + noun,
 		)
 	case !msg.several:
-		text = fmt.Sprintf("opened %s in a new %s", numbers[0], noun)
+		text = fmt.Sprintf("opened %s in a %s behind", numbers[0], noun)
 	default:
 		text = fmt.Sprintf("opened %s in %ss behind", ui.Plural(n, "PR", "PRs"), noun)
 		if msg.skipped > 0 {

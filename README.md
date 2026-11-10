@@ -154,7 +154,7 @@ Some requests are not yours to act on now, and the queue leaves them out: drafts
 
 | Navigate | | Review | |
 |---|---|---|---|
-| `j`/`k` `↓`/`↑` | next/previous row | `enter` `R` | review the pull request, or go to its tab |
+| `j`/`k` `↓`/`↑` | next/previous row | `enter` `R` | open review tabs behind the queue, or go to the pull request's tab |
 | `[` `]` | previous/next stack or author | `space` | mark a pull request; on a stack's header, its pull requests for you |
 | `gg`/`G` | top/bottom | `v` | visual range |
 | `ctrl+d`/`ctrl+u` | half page | `o` | open in the browser |
@@ -169,9 +169,9 @@ Some requests are not yours to act on now, and the queue leaves them out: drafts
 
 ### Reviewing
 
-`enter` on a pull request runs `--review-cmd` in a new tab named after it, such as `#123`, and goes there. `{url}` becomes the pull request's URL and `{pr}` its number. When a tab with that name is already open, `enter` goes to it instead of opening another.
+`enter` on a pull request runs `--review-cmd` in a new tab named after it, such as `#123`. `{url}` becomes the pull request's URL and `{pr}` its number. The tab opens behind the queue, which keeps the focus, so you can keep picking. When a tab with that name is already open, `enter` goes to it instead of opening another.
 
-`enter` with a selection, or on a stack's header, opens every pull request in a tab behind the queue, so you can keep picking. Tabs open in the order to review them: groups as listed, and each stack from the bottom up. Pull requests that already have a tab are skipped.
+`enter` with a selection, or on a stack's header, opens every pull request the same way. Tabs open in the order to review them: groups as listed, and each stack from the bottom up. Pull requests that already have a tab are skipped.
 
 Tabs are herdr tabs inside herdr (`HERDR_ENV=1`) and tmux windows inside tmux. Elsewhere, or with `--review-in inline`, the queue is suspended while the reviews run one after another. Open tabs are checked every two seconds, so a tab you close loses its mark.
 

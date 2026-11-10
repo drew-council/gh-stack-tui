@@ -834,8 +834,8 @@ var helpSections = []ui.HelpSection{
 		{"h ←", "fold the stack"},
 	}},
 	{Title: "review", Keys: [][2]string{
-		{"enter R", "review the PR, or go to its tab"},
-		{"", "selection or a stack: open tabs behind"},
+		{"enter R", "open review tabs behind the queue"},
+		{"", "on a PR with a tab: go to the tab"},
 		{"space", "mark a PR, or a stack's PRs for you"},
 		{"v", "visual range"},
 		{"o", "open in the browser"},

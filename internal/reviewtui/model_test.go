@@ -76,15 +76,16 @@ func TestStartsOnFirstPRForViewer(t *testing.T) {
 	}
 }
 
-func TestReviewOpensFocusedTab(t *testing.T) {
+// A review opens behind the queue, which keeps the focus.
+func TestReviewOpensTabBehind(t *testing.T) {
 	m, tabs := withTabs(t)
 	m = startReview(t, onPR(t, m, 322))
-	want := "#322 focused tuicr pr https://github.com/acme/auth-service/pull/322"
+	want := "#322 behind tuicr pr https://github.com/acme/auth-service/pull/322"
 	if len(tabs.opened) != 1 || tabs.opened[0] != want {
 		t.Fatalf("opened %q, want %q", tabs.opened, want)
 	}
 	if _, open := m.tabs[322]; !open ||
-		!strings.Contains(m.flash, "opened #322 in a new test tab") {
+		!strings.Contains(m.flash, "opened #322 in a test tab behind") {
 		t.Fatalf("tabs %v flash %q", m.tabs, m.flash)
 	}
 }

@@ -1,15 +1,15 @@
  ╭─ Keys ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
  │                                                                                                                                                                                                      │
- │ navigate                                   review                                              queue                                            symbols                                              │
- │ j/k ↓/↑    next/previous row               enter R    review the PR, or go to its tab          .          show drafts, bots, and reviewed PRs   ●          waits on your review (blue)               │
- │ [ ]        previous/next stack or author              selection or a stack: open tabs behind   /          filter by author, title, team, …      ●          waits on another review (peach)           │
- │ gg/G       top/bottom                      space      mark a PR, or a stack's PRs for you      ctrl+r     refresh now                           ○ ✓        in a stack for context / merged           │
- │ ctrl+d/u   half page                       v          visual range                             esc        clear selection, then filter          ◆ ◇        selected: for you / context               │
- │ J/K        scroll the details              o          open in the browser                      ?          help                                  ▎          a tab is reviewing it                     │
- │ l →        unfold the stack                y          copy URL(s)                              q          quit                                  ┊          folded PRs that are not for you           │
- │ h ←        fold the stack                  Y          copy branch name(s)                                                                       on #12     based on that PR's branch, not trunk      │
- │                                                                                                                                                 ✓1 ✗1      others approved / requested changes       │
- │                                                                                                                                                 ✓ ✗ ●      checks passed / failed / running          │
+ │ navigate                                   review                                           queue                                            symbols                                                 │
+ │ j/k ↓/↑    next/previous row               enter R    open review tabs behind the queue     .          show drafts, bots, and reviewed PRs   ●          waits on your review (blue)                  │
+ │ [ ]        previous/next stack or author              on a PR with a tab: go to the tab     /          filter by author, title, team, …      ●          waits on another review (peach)              │
+ │ gg/G       top/bottom                      space      mark a PR, or a stack's PRs for you   ctrl+r     refresh now                           ○ ✓        in a stack for context / merged              │
+ │ ctrl+d/u   half page                       v          visual range                          esc        clear selection, then filter          ◆ ◇        selected: for you / context                  │
+ │ J/K        scroll the details              o          open in the browser                   ?          help                                  ▎          a tab is reviewing it                        │
+ │ l →        unfold the stack                y          copy URL(s)                           q          quit                                  ┊          folded PRs that are not for you              │
+ │ h ←        fold the stack                  Y          copy branch name(s)                                                                    on #12     based on that PR's branch, not trunk         │
+ │                                                                                                                                              ✓1 ✗1      others approved / requested changes          │
+ │                                                                                                                                              ✓ ✗ ●      checks passed / failed / running             │
  │                                                                                                                                                                                                      │
  │ you                                                                                                                                                                                                  │
  │ review     asked, not reviewed yet                                                                                                                                                                   │
