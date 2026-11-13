@@ -75,6 +75,8 @@ type Model struct {
 	loadingRemote bool
 	reloadRemote  bool
 	fingerprint   string
+	// ghStackWarning says what is wrong with the installed gh stack, or "".
+	ghStackWarning string
 	// gh talks to the stack's repository on GitHub, once it is resolved.
 	gh Remote
 
@@ -169,6 +171,7 @@ func (m Model) withStyles(st ui.Styles) Model {
 func (m Model) Init() tea.Cmd {
 	cmds := []tea.Cmd{
 		m.loadLocal(),
+		m.checkGHStack(),
 		m.spinner.Tick,
 		pollTick(m.opts.PollInterval),
 		remoteTick(m.opts.RemoteInterval),
@@ -240,6 +243,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.fingerprint = msg.value
 			return m, m.requestLocal()
 		}
+		return m, nil
+
+	case ghStackMsg:
+		m.ghStackWarning = msg.check.Warning()
+		// The note takes a line from the body.
+		m.ensureVisible()
 		return m, nil
 
 	case remoteTickMsg:

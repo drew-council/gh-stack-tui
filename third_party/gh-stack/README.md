@@ -29,3 +29,6 @@ gh-stack has no stable Go API, so an upgrade may need shim changes. Keep it on t
 2. Run `go mod tidy` at the repository root, then update `vendorHash` in `flake.nix`.
 3. Fix what doesn't compile in `shim/ghstack`, then run its tests there.
 4. Run `go test ./...` at the repository root.
+5. Update the version in the root README's `ghst` usage section.
+
+`ghst` warns when the installed `gh stack` differs from this release in major or minor version. It reads the release from the binary's build info, so the warning follows an upgrade with no further change.

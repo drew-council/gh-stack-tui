@@ -57,3 +57,7 @@ func (s *Source) Fingerprint() (string, error) {
 
 // CurrentBranch returns the checked out branch, or "" when HEAD is detached.
 func (s *Source) CurrentBranch() string { return s.repo.CurrentBranch() }
+
+// GHStack compares the installed gh stack with the release this build reads
+// stack files as. It runs gh, so it may take a moment.
+func (s *Source) GHStack() GHStack { return CheckGHStack(s.repo.Root) }

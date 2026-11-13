@@ -17,6 +17,9 @@ type Local interface {
 	// Fingerprint changes whenever Load would return something new.
 	Fingerprint() (string, error)
 	CurrentBranch() string
+	// GHStack compares the installed gh stack with the release ghst reads
+	// stack files as.
+	GHStack() stack.GHStack
 }
 
 // Remote is where pull requests come from. [github.Client] talks to GitHub.

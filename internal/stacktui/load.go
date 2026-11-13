@@ -18,6 +18,7 @@ type (
 	pollTickMsg    struct{}
 	remoteTickMsg  struct{}
 	fingerprintMsg struct{ value string }
+	ghStackMsg     struct{ check stack.GHStack }
 
 	localLoadedMsg struct {
 		snap   *stack.Snapshot
@@ -70,6 +71,13 @@ func pollTick(d time.Duration) tea.Cmd {
 
 func remoteTick(d time.Duration) tea.Cmd {
 	return tea.Tick(d, func(time.Time) tea.Msg { return remoteTickMsg{} })
+}
+
+// checkGHStack compares the installed gh stack with the release ghst reads
+// stack files as, once at startup.
+func (m *Model) checkGHStack() tea.Cmd {
+	local := m.local
+	return func() tea.Msg { return ghStackMsg{check: local.GHStack()} }
 }
 
 // fingerprintCmd cheaply summarizes local state so that commits, checkouts,

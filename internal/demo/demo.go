@@ -38,6 +38,12 @@ func (s *Source) Dir() string { return s.dir }
 
 func (s *Source) CurrentBranch() string { return CurrentBranch }
 
+// GHStack reports the gh stack this build expects as installed.
+func (s *Source) GHStack() stack.GHStack {
+	v := stack.ExpectedGHStack()
+	return stack.GHStack{Expected: v, Installed: v}
+}
+
 // Fingerprint never changes: the demo stacks stay as they are.
 func (s *Source) Fingerprint() (string, error) { return "demo", nil }
 

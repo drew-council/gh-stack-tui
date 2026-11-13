@@ -597,3 +597,36 @@ func TestCachedPRsShowUntilGitHubAnswers(t *testing.T) {
 		t.Fatal("a late cache read should not replace live PRs")
 	}
 }
+
+func TestGHStackMismatchNote(t *testing.T) {
+	m := testModel()
+	m = update(m, ghStackMsg{check: stack.GHStack{Expected: "0.2.1", Installed: "0.2.4"}})
+	if n := len(m.headerLines()); n != 0 {
+		t.Fatalf("a patch difference should add no note, got %d lines", n)
+	}
+	m = update(m, ghStackMsg{check: stack.GHStack{Expected: "0.2.1", Installed: "0.3.0"}})
+	lines := m.headerLines()
+	if len(lines) != 1 {
+		t.Fatalf("mismatch should add one line, got %d", len(lines))
+	}
+	if got := strings.TrimSpace(
+		ansi.Strip(lines[0]),
+	); got != "gh stack 0.3.0 installed; ghst expects 0.2.x" {
+		t.Fatalf("note = %q", got)
+	}
+	// The note stays when the stack reloads or a flash comes and goes.
+	m = update(m, localLoadedMsg{snap: m.snap})
+	m = update(m, clearFlashMsg{seq: m.flashSeq})
+	if len(m.headerLines()) != 1 {
+		t.Fatal("note should persist")
+	}
+}
+
+// The demo's gh stack matches, so its screens carry no note.
+func TestDemoGHStackMatches(t *testing.T) {
+	m := demoModel(t, 80, 30)
+	msg := m.checkGHStack()()
+	if m = update(m, msg); m.ghStackWarning != "" {
+		t.Fatalf("demo warned %q", m.ghStackWarning)
+	}
+}

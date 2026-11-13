@@ -58,6 +58,8 @@ The TUI shows the stack containing the checked out branch and follows you when y
 
 Stack operations run `gh stack` against the checked out stack. When you are viewing a different stack, press `c` on one of its branches first.
 
+`ghst` reads gh-stack's files with gh-stack's own code, from the release in `go.mod`, now v0.2.1. Install a matching `gh stack`; a different release may store stacks differently. At startup `ghst` runs `gh stack --version` and warns above the stack when the major or minor version differs, or when `gh` or `gh stack` is missing.
+
 ### Reading the stack
 
 Each branch is a block on the tree, top of the stack first. The left column reads like a sentence: the branch, then its PR number, state, and title, then the branch's own state, such as a rebase or conflicts, followed by where review stands, such as the review decision and unresolved threads. The right column holds CI, then the diff. Every branch that has not merged takes three lines, however long its title. Under them are the branch's files, commits, and checks, each of which opens on its own.

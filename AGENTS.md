@@ -26,6 +26,8 @@ Both TUIs ask `desktop.Reviews` where a review opens: a tab, the TUI's own termi
 
 GitHub does not say which files are generated. `ghrv` asks the checkout through `Local`, as `ghst` does through `git.Repo`, and flags the files when their details load. Line and file counts on screen MUST come from `Model.size`, not from the PR's own totals.
 
+`ghst` warns when the installed `gh stack` differs from the gh-stack release it was built against (`internal/stack/version.go`). That release comes from the binary's build info, not a constant. A `replace` of gh-stack by a directory has no version and turns the check off.
+
 `ghrv` learns stacks from GitHub's stacks API, not from the local gh-stack file: the stacks are other people's. The queue's query is cheap on purpose, and `FetchReviewDetails` fetches the costly parts per PR, only when a PR's `Version` changes.
 
 ## Testing

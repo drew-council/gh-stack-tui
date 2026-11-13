@@ -191,7 +191,8 @@ func (m Model) stackTitle() (title, info string) {
 }
 
 // headerLines are the notes above the stack panel: working tree state that
-// needs attention, and GitHub errors. They are empty most of the time.
+// needs attention, a gh stack that ghst may misread, and GitHub errors. They
+// are empty most of the time.
 func (m Model) headerLines() []string {
 	s := m.st
 	var lines []string
@@ -211,6 +212,9 @@ func (m Model) headerLines() []string {
 		if len(notes) > 0 {
 			lines = append(lines, " "+strings.Join(notes, s.Dim.Render(" · ")))
 		}
+	}
+	if m.ghStackWarning != "" {
+		lines = append(lines, " "+s.Warn.Render(m.ghStackWarning))
 	}
 	if m.remoteErr != nil {
 		lines = append(lines, " "+s.Err.Render("GitHub: "+ui.FirstLine(m.remoteErr.Error())))
