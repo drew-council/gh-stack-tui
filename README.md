@@ -7,6 +7,32 @@ Two terminal UIs for working with [gh-stack](https://github.com/github/gh-stack)
 
 Both are built from the same packages, look alike, and share a cache.
 
+## Configuration
+
+Both programs read defaults from `$XDG_CONFIG_HOME/gh-stack-tui/config.json`, else `~/.config/gh-stack-tui/config.json`, on macOS too. Flags passed on the command line win over the file, and the file wins over the built-in defaults. A missing file is fine; a malformed one, or one with an unknown key, is an error.
+
+`review_in` applies to both. Each program reads its own section, whose keys match its flags. Durations are Go durations, such as `30s`. Every key is optional, and `-C` and `--stack` are flags only.
+
+```json
+{
+  "review_in": "auto",
+  "ghst": {
+    "review_cmd": "tuicr -r {range}",
+    "review_pr_cmd": "tuicr pr {pr}",
+    "interval": "30s",
+    "poll": "2s"
+  },
+  "ghrv": {
+    "review_cmd": "tuicr pr {url}",
+    "teams": ["platform"],
+    "drafts": false,
+    "bots": false,
+    "interval": "30s",
+    "poll": "2s"
+  }
+}
+```
+
 ## ghst
 
 `ghst` covers what `gh stack view` shows, and adds:

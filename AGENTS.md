@@ -13,6 +13,7 @@ Agents MAY update this file without asking. When a change makes something here w
 - `internal/desktop`: the clipboard, the browser, herdr and tmux tabs, and where reviews open.
 - `internal/github`: GraphQL and REST queries: PR, CI, and reviewer state for `ghst`, the review queue and GitHub's stacks for `ghrv`.
 - `internal/review`: what each PR of a review queue needs from the viewer, and how the queue groups into stacks. No I/O.
+- `internal/config`: the JSON config file, and how it sets the flags a user did not pass. Each program applies it in its `PersistentPreRunE`.
 - `internal/cache`: SQLite cache of GitHub results, generated with sqlc. Both programs use the same file.
 - `internal/git`, `internal/stack`: local repository and stack state, for `ghst`.
 - `internal/demo`: made-up stacks, a made-up review queue, and made-up tabs, for `ghst demo`, `ghrv demo`, and the rendering tests.

@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/drew-council/gh-stack-tui/internal/cache"
+	"github.com/drew-council/gh-stack-tui/internal/config"
 	"github.com/drew-council/gh-stack-tui/internal/demo"
 	"github.com/drew-council/gh-stack-tui/internal/desktop"
 	"github.com/drew-council/gh-stack-tui/internal/git"
@@ -29,8 +30,17 @@ func rootCmd() *cobra.Command {
 		Short:        "A terminal UI for the pull requests that wait on your review",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
-		PersistentPreRunE: func(*cobra.Command, []string) error {
-			var err error
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			if config.ForCompletion(cmd) {
+				return nil
+			}
+			cfg, err := config.Load()
+			if err != nil {
+				return err
+			}
+			if err := cfg.ApplyGhrv(cmd.Flags()); err != nil {
+				return err
+			}
 			if opts.Reviews, err = desktop.NewReviews(reviewIn); err != nil {
 				return err
 			}

@@ -2,6 +2,7 @@ package desktop
 
 import (
 	"errors"
+	"fmt"
 	"os/exec"
 	"regexp"
 	"slices"
@@ -39,13 +40,22 @@ type Reviews struct {
 // and "" open reviews in a herdr tab inside herdr, a tmux window inside tmux,
 // and in the TUI's terminal otherwise.
 func NewReviews(pref string) (Reviews, error) {
-	switch pref {
-	case "browser":
-		return Reviews{Browser: true}, nil
-	case "", "auto", "herdr", "tmux", "inline":
-		return Reviews{Tabs: NewTabs(TabTarget(pref))}, nil
+	if err := CheckReviewIn(pref); err != nil {
+		return Reviews{}, fmt.Errorf("--review-in %w", err)
 	}
-	return Reviews{}, errors.New("--review-in must be " + ReviewPlaces)
+	if pref == "browser" {
+		return Reviews{Browser: true}, nil
+	}
+	return Reviews{Tabs: NewTabs(TabTarget(pref))}, nil
+}
+
+// CheckReviewIn reports whether pref is one of [ReviewPlaces].
+func CheckReviewIn(pref string) error {
+	switch pref {
+	case "", "auto", "herdr", "tmux", "inline", "browser":
+		return nil
+	}
+	return errors.New("must be " + ReviewPlaces)
 }
 
 // Where returns where command opens. A command whose program is not
