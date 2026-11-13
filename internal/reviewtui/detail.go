@@ -245,10 +245,12 @@ func (m Model) find(number int) (review.Item, bool) {
 	return review.Item{}, false
 }
 
-// mdKey identifies a rendered description: its text and its width.
+// mdKey identifies a rendered description: its text, its width, and the
+// flavor it is colored in.
 type mdKey struct {
 	body  string
 	width int
+	dark  bool
 }
 
 // mdCacheSize is how many rendered descriptions are kept.
@@ -258,7 +260,7 @@ const mdCacheSize = 64
 // text and highlights its code, which is too slow to do on every frame, so
 // the lines are kept.
 func (m Model) markdown(body string, w int) []string {
-	key := mdKey{body, w}
+	key := mdKey{body, w, m.st.Dark}
 	if lines, ok := m.rendered[key]; ok {
 		return lines
 	}

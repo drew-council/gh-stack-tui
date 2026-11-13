@@ -41,6 +41,7 @@ func rootCmd() *cobra.Command {
 			if err := cfg.ApplyGhrv(cmd.Flags()); err != nil {
 				return err
 			}
+			opts.Theme = cfg.Theme
 			if opts.Reviews, err = desktop.NewReviews(reviewIn); err != nil {
 				return err
 			}

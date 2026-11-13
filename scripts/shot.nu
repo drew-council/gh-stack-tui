@@ -40,11 +40,13 @@ def "main keys" [...keys: string] {
   sleep 400ms
 }
 
-# Writes tmp/shots/<name>.png and prints its path.
-def "main shot" [name: string] {
+# Writes tmp/shots/<name>.png and prints its path. --light draws it on
+# Catppuccin Latte's base, for the light theme, instead of Mocha's.
+def "main shot" [name: string --light] {
   let png = $"($out)/($name).png"
+  let base = if $light { {rgb: "239;241;245" hex: "#eff1f5"} } else { {rgb: "30;30;46" hex: "#1e1e2e"} }
   # freeze ignores the default background, so set the base color instead.
-  let screen = t capture-pane -e -p -t demo | str replace -a "\e[49m" $"\e[48;2;30;30;46m"
+  let screen = t capture-pane -e -p -t demo | str replace -a "\e[49m" $"\e[48;2;($base.rgb)m"
   # tmux sets colors only where they change, but freeze resets them at each
   # line, so start every line with the foreground still in effect. Carried
   # backgrounds would paint the padding.
@@ -71,7 +73,7 @@ def "main shot" [name: string] {
     "--font.size"
     "14"
     "--background"
-    "#1e1e2e"
+    $base.hex
     "--padding"
     "16"
     "--margin"

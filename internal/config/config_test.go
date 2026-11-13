@@ -10,6 +10,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"github.com/drew-council/gh-stack-tui/internal/ui"
 )
 
 func write(t *testing.T, body string) string {
@@ -57,8 +59,23 @@ func TestLoadFile(t *testing.T) {
 	}
 }
 
+func TestLoadFileTheme(t *testing.T) {
+	c, err := LoadFile(write(t, `{"theme": "light"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Theme != ui.ThemeLight {
+		t.Errorf("theme = %q", c.Theme)
+	}
+	if c, _ := LoadFile(write(t, `{}`)); !c.Theme.Auto() {
+		t.Errorf("unset theme = %q, want auto", c.Theme)
+	}
+}
+
 func TestLoadFileErrors(t *testing.T) {
 	for name, body := range map[string]string{
+		"bad theme":       `{"theme": "solarized"}`,
+		"number theme":    `{"theme": 1}`,
 		"unknown key":     `{"ghst": {"intreval": "30s"}}`,
 		"bad duration":    `{"ghrv": {"poll": "soon"}}`,
 		"number duration": `{"ghrv": {"poll": 30}}`,

@@ -38,6 +38,8 @@ type Options struct {
 	// keeps the reviewer list between runs. CacheErr is why it is not set.
 	Cache    *cache.Cache
 	CacheErr error
+	// Theme picks the colors.
+	Theme ui.Theme
 }
 
 type mode int
@@ -135,18 +137,12 @@ func New(local Local, opts Options) Model {
 	if opts.Connect == nil {
 		opts.Connect = connectGitHub
 	}
-	st := ui.NewStyles()
 	in := textinput.New()
 	in.Prompt = ""
 	in.CharLimit = 256
-	is := in.Styles()
-	is.Focused.Placeholder = st.Dim
-	is.Blurred.Placeholder = st.Dim
-	in.SetStyles(is)
 	return Model{
 		opts:  opts,
 		local: local,
-		st:    st,
 		// Init starts the first local load.
 		loadingLocal: true,
 		prs:          map[string]*github.PR{},
@@ -154,11 +150,20 @@ func New(local Local, opts Options) Model {
 		marks:        map[string]bool{},
 		input:        in,
 		now:          time.Now,
-		spinner: spinner.New(
-			spinner.WithSpinner(spinner.MiniDot),
-			spinner.WithStyle(st.Dim),
-		),
-	}
+		spinner:      spinner.New(spinner.WithSpinner(spinner.MiniDot)),
+	}.withStyles(opts.Theme.Styles())
+}
+
+// withStyles returns m drawn in st.
+func (m Model) withStyles(st ui.Styles) Model {
+	m.st = st
+	is := textinput.DefaultStyles(st.Dark)
+	is.Focused.Placeholder = st.Dim
+	is.Blurred.Placeholder = st.Dim
+	is.Cursor.Color = st.Text
+	m.input.SetStyles(is)
+	m.spinner.Style = st.Dim
+	return m
 }
 
 func (m Model) Init() tea.Cmd {
@@ -167,6 +172,7 @@ func (m Model) Init() tea.Cmd {
 		m.spinner.Tick,
 		pollTick(m.opts.PollInterval),
 		remoteTick(m.opts.RemoteInterval),
+		m.opts.Theme.Request(),
 	}
 	if err := m.opts.CacheErr; err != nil {
 		cmds = append(cmds, func() tea.Msg {
@@ -184,6 +190,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Branch heights depend on the width.
 		m.rebuild()
 		m.ensureVisible()
+		return m, nil
+
+	case tea.BackgroundColorMsg:
+		if st, ok := m.opts.Theme.Follow(m.st, msg); ok {
+			m = m.withStyles(st)
+		}
 		return m, nil
 
 	case tea.KeyPressMsg:

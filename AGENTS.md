@@ -57,6 +57,8 @@ nix develop -c nu scripts/shot.nu stop
 
 `ghrv` is made for a full screen, so start it wide: `nix develop -c nu scripts/shot.nu start 200 50 --bin ghrv`. `start` also takes `--args` to run something other than the demo and `--vars` to set environment variables for it.
 
+Colors come from `ui.NewStyles(dark)`: Catppuccin Mocha when dark, Latte when light. Nothing in a TUI picks a color by hand. `theme` in the config file, `ui.Theme`, forces one; `auto` follows the terminal's `tea.BackgroundColorMsg`. Anything cached in rendered form MUST be keyed by `Styles.Dark` or redrawn when the styles change, as `ghrv`'s Markdown cache is. Look at a visual change in both flavors. tmux may not report a light background, so force the theme with a config file: write `{"theme": "light"}` to `<dir>/gh-stack-tui/config.json`, start with `--vars XDG_CONFIG_HOME=<dir>`, and pass `--light` to `shot` so the screen is drawn on Latte's base.
+
 `shot` writes `tmp/shots/<name>.png`, which can be read as an image, and prints its path. `text` prints the screen as plain text and `resize` changes its size. Keys are tmux key names. freeze has no font fallback, so a glyph the font lacks, such as `↻`, shows as a box in shots but not in a terminal. freeze also draws background colors a little off, so padding around a filled label can look uneven in shots. Check the escape codes before fixing spacing seen only in a shot.
 
 People can run `go run ./cmd/ghst demo` and `go run ./cmd/ghrv demo` themselves.

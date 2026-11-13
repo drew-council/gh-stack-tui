@@ -8,7 +8,6 @@ import (
 	"charm.land/glamour/v2"
 	gansi "charm.land/glamour/v2/ansi"
 	"charm.land/lipgloss/v2"
-	catppuccin "github.com/catppuccin/go"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -55,7 +54,13 @@ func (s Styles) glamour() gansi.StyleConfig {
 	yes := true
 	margin := func(n uint) *uint { return &n }
 	quote := GlyphConn + " "
-	surface := catppuccin.Mocha.Surface0().Hex
+	surface := s.flavor.Surface0().Hex
+	// Latte's peach is too faint on its surface, so code is set apart by its
+	// background alone there, as on GitHub.
+	code := s.Peach
+	if !s.Dark {
+		code = s.Text
+	}
 	return gansi.StyleConfig{
 		Document: gansi.StyleBlock{
 			StylePrimitive: gansi.StylePrimitive{Color: hex(s.Text)},
@@ -87,7 +92,7 @@ func (s Styles) glamour() gansi.StyleConfig {
 		ImageText: gansi.StylePrimitive{Color: hex(s.Muted), Format: "image: {{.text}}"},
 		Code: gansi.StyleBlock{
 			StylePrimitive: gansi.StylePrimitive{
-				Color: hex(s.Peach), BackgroundColor: &surface,
+				Color: hex(code), BackgroundColor: &surface,
 			},
 		},
 		CodeBlock: gansi.StyleCodeBlock{
@@ -95,7 +100,7 @@ func (s Styles) glamour() gansi.StyleConfig {
 				StylePrimitive: gansi.StylePrimitive{Color: hex(s.Muted)},
 				Margin:         margin(2),
 			},
-			Theme: "catppuccin-mocha",
+			Theme: "catppuccin-" + s.flavor.Name(),
 		},
 		Table: gansi.StyleTable{
 			StyleBlock: gansi.StyleBlock{StylePrimitive: gansi.StylePrimitive{Color: hex(s.Text)}},

@@ -22,7 +22,7 @@ func TestMarkdown(t *testing.T) {
 	body := "<!-- Describe the change. -->\n## Why\nSessions *expired* early, see #12.\n\n\n\n" +
 		"### What\n- **First** item that is long enough to wrap around\n" +
 		"- [x] Second\n\n> quoted\n\n```go\nfunc main() {}\n```\n"
-	got := plain(NewStyles().Markdown(body, 30))
+	got := plain(NewStyles(true).Markdown(body, 30))
 	want := []string{
 		"Why",
 		"",
@@ -45,7 +45,7 @@ func TestMarkdown(t *testing.T) {
 }
 
 func TestMarkdownFitsWidthAndStyles(t *testing.T) {
-	st := NewStyles()
+	st := NewStyles(true)
 	lines := st.Markdown("## Head\n\n"+strings.Repeat("word ", 40)+"`code`", 24)
 	for _, l := range lines {
 		if w := lipgloss.Width(l); w > 24 {

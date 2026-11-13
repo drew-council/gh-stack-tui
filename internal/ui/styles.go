@@ -14,9 +14,14 @@ import (
 )
 
 // Styles is the palette and the styles built from it. Colors come from
-// Catppuccin Mocha, so the TUIs match other Catppuccin-themed tools. Color
-// marks state that needs attention; everything else is primary or muted ink.
+// Catppuccin, Mocha on dark terminals and Latte on light ones, so the TUIs
+// match other Catppuccin-themed tools. Color marks state that needs
+// attention; everything else is primary or muted ink.
 type Styles struct {
+	// Dark is set for Mocha and unset for Latte.
+	Dark   bool
+	flavor catppuccin.Flavor
+
 	Text, Muted, Faint, Border, Accent color.Color
 	Green, Yellow, Peach, Mauve        color.Color
 	Red, Teal, Draft, OnFill           color.Color
@@ -72,11 +77,17 @@ type Styles struct {
 	FlashErr lipgloss.Style
 }
 
-// NewStyles returns the styles of every TUI.
-func NewStyles() Styles {
-	f := catppuccin.Mocha
+// NewStyles returns the styles of every TUI, in Mocha when dark and in
+// Latte otherwise.
+func NewStyles(dark bool) Styles {
+	f := catppuccin.Latte
+	if dark {
+		f = catppuccin.Mocha
+	}
 	c := func(col catppuccin.Color) color.Color { return lipgloss.Color(col.Hex) }
 	s := Styles{
+		Dark:     dark,
+		flavor:   f,
 		Text:     c(f.Text()),
 		Muted:    c(f.Subtext0()),
 		Faint:    c(f.Overlay1()),

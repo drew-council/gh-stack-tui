@@ -43,6 +43,8 @@ type Options struct {
 	// why it is not set.
 	Cache    *cache.Cache
 	CacheErr error
+	// Theme picks the colors.
+	Theme ui.Theme
 }
 
 type mode int
@@ -132,19 +134,13 @@ type Model struct {
 
 // New creates the model of a review queue.
 func New(opts Options) Model {
-	st := ui.NewStyles()
 	in := textinput.New()
 	in.Prompt = ""
 	in.CharLimit = 128
 	in.Placeholder = "author, title, number, branch, or team"
-	is := in.Styles()
-	is.Focused.Placeholder = st.Dim
-	is.Blurred.Placeholder = st.Dim
-	in.SetStyles(is)
 	place, _ := opts.Reviews.Where(opts.ReviewCmd)
 	return Model{
 		opts:  opts,
-		st:    st,
 		place: place,
 		// Init starts the first load.
 		loadingRemote:  true,
@@ -158,11 +154,20 @@ func New(opts Options) Model {
 		marks:          map[int]struct{}{},
 		input:          in,
 		now:            time.Now,
-		spinner: spinner.New(
-			spinner.WithSpinner(spinner.MiniDot),
-			spinner.WithStyle(st.Dim),
-		),
-	}
+		spinner:        spinner.New(spinner.WithSpinner(spinner.MiniDot)),
+	}.withStyles(opts.Theme.Styles())
+}
+
+// withStyles returns m drawn in st.
+func (m Model) withStyles(st ui.Styles) Model {
+	m.st = st
+	is := textinput.DefaultStyles(st.Dark)
+	is.Focused.Placeholder = st.Dim
+	is.Blurred.Placeholder = st.Dim
+	is.Cursor.Color = st.Text
+	m.input.SetStyles(is)
+	m.spinner.Style = st.Dim
+	return m
 }
 
 func (m Model) Init() tea.Cmd {
@@ -173,6 +178,7 @@ func (m Model) Init() tea.Cmd {
 		m.spinner.Tick,
 		pollTick(m.opts.PollInterval),
 		remoteTick(m.opts.RemoteInterval),
+		m.opts.Theme.Request(),
 	}
 	if err := m.opts.CacheErr; err != nil {
 		cmds = append(cmds, func() tea.Msg {
@@ -189,6 +195,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.input.SetWidth(max(10, msg.Width-20))
 		m.ensureVisible()
 		m.clampDetail()
+		return m, nil
+
+	case tea.BackgroundColorMsg:
+		if st, ok := m.opts.Theme.Follow(m.st, msg); ok {
+			m = m.withStyles(st)
+		}
 		return m, nil
 
 	case tea.KeyPressMsg:

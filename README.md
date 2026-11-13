@@ -11,11 +11,12 @@ Both are built from the same packages, look alike, and share a cache.
 
 Both programs read defaults from `$XDG_CONFIG_HOME/gh-stack-tui/config.json`, else `~/.config/gh-stack-tui/config.json`, on macOS too. Flags passed on the command line win over the file, and the file wins over the built-in defaults. A missing file is fine; a malformed one, or one with an unknown key, is an error.
 
-`review_in` applies to both. Each program reads its own section, whose keys match its flags. Durations are Go durations, such as `30s`. Every key is optional, and `-C` and `--stack` are flags only.
+`review_in` and `theme` apply to both. `theme` picks the colors: `auto`, the default, follows the terminal's background, with Catppuccin Latte on a light one and Mocha on a dark one. `dark` and `light` force Mocha or Latte. A terminal that does not report its background gets Mocha. Each program reads its own section, whose keys match its flags. Durations are Go durations, such as `30s`. Every key is optional, and `-C` and `--stack` are flags only.
 
 ```json
 {
   "review_in": "auto",
+  "theme": "auto",
   "ghst": {
     "review_cmd": "tuicr -r {range}",
     "review_pr_cmd": "tuicr pr {pr}",
@@ -41,7 +42,7 @@ Both programs read defaults from `$XDG_CONFIG_HOME/gh-stack-tui/config.json`, el
 - **CI checks per PR**, grouped by workflow. Each workflow expands to its jobs, and re-runs are deduplicated.
 - **Stack operations without leaving the TUI:** push, sync, rebase, submit, merge, add, and unstack. Output streams into a panel under the stack. Commands started while one is running queue up and run in order; a failure or `ctrl+c` drops the rest. `gh stack modify` runs in the foreground and the TUI comes back when it exits.
 - **Vim-style keys throughout.** Arrow keys also work.
-- **Catppuccin Mocha** colors, with the stack drawn as a tree like `gh stack view`.
+- **Catppuccin** colors, Mocha on dark terminals and Latte on light ones, with the stack drawn as a tree like `gh stack view`.
 - **Copying** the hovered file path, commit SHA, branch name, or URL.
 - **Review:** select layers of the stack and open their combined commit range in [tuicr](https://github.com/agavra/tuicr), or a single layer's PR, in a new herdr tab, a new tmux window, or inline. Without tuicr, the changes open on GitHub.
 

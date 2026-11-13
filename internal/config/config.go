@@ -19,14 +19,16 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/drew-council/gh-stack-tui/internal/desktop"
+	"github.com/drew-council/gh-stack-tui/internal/ui"
 )
 
 // Config is the config file. A nil field is unset and leaves the flag's
 // default alone.
 type Config struct {
-	ReviewIn *string `json:"review_in"`
-	Ghst     Ghst    `json:"ghst"`
-	Ghrv     Ghrv    `json:"ghrv"`
+	ReviewIn *string  `json:"review_in"`
+	Theme    ui.Theme `json:"theme"` // unset is auto
+	Ghst     Ghst     `json:"ghst"`
+	Ghrv     Ghrv     `json:"ghrv"`
 }
 
 // Ghst holds defaults for ghst's flags.

@@ -2,10 +2,12 @@
 package uitest
 
 import (
+	"fmt"
 	"image/color"
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/sebdah/goldie/v2"
 
@@ -45,4 +47,23 @@ func Plain(st ui.Styles, screen string) string {
 func AssertScreen(t *testing.T, st ui.Styles, screen string) {
 	t.Helper()
 	goldie.New(t).Assert(t, t.Name(), []byte(Plain(st, screen)))
+}
+
+// LightBackground is a terminal's answer that its background is light.
+var LightBackground = tea.BackgroundColorMsg{Color: color.RGBA{0xef, 0xf1, 0xf5, 0xff}}
+
+// AssertFlavor fails t unless screen is drawn in the Catppuccin flavor of
+// dark: it uses that flavor's text color and not the other's.
+func AssertFlavor(t *testing.T, screen string, dark bool) {
+	t.Helper()
+	text := func(dark bool) string {
+		r, g, b, _ := ui.NewStyles(dark).Text.RGBA()
+		return fmt.Sprintf("38;2;%d;%d;%d", r>>8, g>>8, b>>8)
+	}
+	if !strings.Contains(screen, text(dark)) {
+		t.Errorf("screen lacks the text color of dark=%v", dark)
+	}
+	if strings.Contains(screen, text(!dark)) {
+		t.Errorf("screen has the text color of dark=%v", !dark)
+	}
 }
