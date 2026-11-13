@@ -592,3 +592,12 @@ func (t *Tabs) List() ([]desktop.Tab, error) {
 }
 
 func (t *Tabs) Focus(string) error { return nil }
+
+// Reviews opens reviews in demo tabs, with one already open for each label.
+// Every program counts as installed, since the tabs run nothing.
+func Reviews(labels ...string) desktop.Reviews {
+	return desktop.Reviews{
+		Tabs:      NewTabs(labels...),
+		Installed: func(string) bool { return true },
+	}
+}

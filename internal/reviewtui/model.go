@@ -32,8 +32,8 @@ type Options struct {
 	// Local says which changed files are generated, to leave them out of the
 	// line counts. Nil counts every file.
 	Local Local
-	// Tabs is where reviews open. Nil runs them in the TUI's own terminal.
-	Tabs desktop.Tabs
+	// Reviews decides where reviews open.
+	Reviews desktop.Reviews
 	// Query selects the queue, and Show the kinds of PRs it keeps.
 	Query github.QueueQuery
 	Show  review.Options
@@ -88,6 +88,9 @@ type Model struct {
 	// tabs this TUI opened a moment ago, which a poll may not list yet.
 	tabs   map[int]string
 	opened map[int]openedTab
+	// place is where a review opens, as last checked. Polls check again, in
+	// case the review command was installed or removed.
+	place desktop.Place
 
 	st ui.Styles
 
@@ -138,9 +141,11 @@ func New(opts Options) Model {
 	is.Focused.Placeholder = st.Dim
 	is.Blurred.Placeholder = st.Dim
 	in.SetStyles(is)
+	place, _ := opts.Reviews.Where(opts.ReviewCmd)
 	return Model{
-		opts: opts,
-		st:   st,
+		opts:  opts,
+		st:    st,
+		place: place,
 		// Init starts the first load.
 		loadingRemote:  true,
 		details:        map[int]cache.Detail{},
@@ -219,7 +224,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case pollTickMsg:
-		return m, tea.Batch(m.loadTabs(), pollTick(m.opts.PollInterval))
+		return m, tea.Batch(m.loadTabs(), m.checkPlace(), pollTick(m.opts.PollInterval))
+
+	case placeCheckedMsg:
+		m.place = msg.place
+		return m, nil
 
 	case remoteTickMsg:
 		return m, tea.Batch(m.requestRemote(), remoteTick(m.opts.RemoteInterval))

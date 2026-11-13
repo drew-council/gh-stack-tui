@@ -54,7 +54,7 @@ func withTabs(t *testing.T, open ...string) (Model, *fakeTabs) {
 		tabs.tabs = append(tabs.tabs, desktop.Tab{ID: "t" + label, Label: label})
 	}
 	m := demoModel(t, 200, 50)
-	m.opts.Tabs = tabs
+	m.opts.Reviews = desktop.Reviews{Tabs: tabs, Installed: func(string) bool { return true }}
 	return update(m, m.loadTabs()()), tabs
 }
 
@@ -87,6 +87,21 @@ func TestReviewOpensTabBehind(t *testing.T) {
 	if _, open := m.tabs[322]; !open ||
 		!strings.Contains(m.flash, "opened #322 in a test tab behind") {
 		t.Fatalf("tabs %v flash %q", m.tabs, m.flash)
+	}
+}
+
+// Without the review command, a review opens on GitHub, not in a tab.
+func TestReviewWithoutToolOpensBrowser(t *testing.T) {
+	m, tabs := withTabs(t)
+	m.opts.Reviews.Installed = func(string) bool { return false }
+	m = onPR(t, m, 322)
+	if cmd := (&m).startReview(); cmd == nil || len(tabs.opened) != 0 ||
+		m.place != desktop.InBrowser {
+		t.Fatalf("opened %q, place %v", tabs.opened, m.place)
+	}
+	m.flash = ""
+	if hints := ansi.Strip(m.footerText()); !strings.Contains(hints, "review in browser") {
+		t.Fatalf("hints %q", hints)
 	}
 }
 

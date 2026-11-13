@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/drew-council/gh-stack-tui/internal/cache"
+	"github.com/drew-council/gh-stack-tui/internal/desktop"
 	"github.com/drew-council/gh-stack-tui/internal/github"
 	"github.com/drew-council/gh-stack-tui/internal/stack"
 	"github.com/drew-council/gh-stack-tui/internal/ui"
@@ -28,8 +29,8 @@ type Options struct {
 	// ReviewPRCmd reviews a single branch that has an open PR, draft or ready;
 	// {pr} is replaced by the PR number. Empty always reviews the commit range.
 	ReviewPRCmd string
-	// ReviewIn picks where the review opens: auto, herdr, tmux, or inline.
-	ReviewIn string
+	// Reviews decides where reviews open.
+	Reviews desktop.Reviews
 	// Connect returns the Remote for the stack file's "host:owner/name".
 	// Nil connects to GitHub as the gh CLI's user.
 	Connect func(repository string) (Remote, error)

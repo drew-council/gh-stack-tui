@@ -26,7 +26,7 @@ func newDemo(t *testing.T, width, height int) (Model, *demo.ReviewRemote) {
 		Repo:      remote.Repository(),
 		ReviewCmd: "tuicr pr {url}",
 		Local:     demo.Checkout{},
-		Tabs:      demo.NewTabs("#337"),
+		Reviews:   demo.Reviews("#337"),
 		Connect:   func() (Remote, error) { return remote, nil },
 	})
 	m.now = func() time.Time { return testNow }

@@ -424,6 +424,33 @@ func (m *Model) reviewCommand(sel []int) (command, note string, err error) {
 	return strings.ReplaceAll(m.opts.ReviewCmd, "{range}", rng), note, nil
 }
 
+// reviewURL returns the GitHub page that shows what reviewCommand would
+// review, and what names it. A single branch with an open PR is its PR's
+// files; anything else compares the bottom branch's parent with the top
+// branch, as pushed. url is "" when GitHub is not connected.
+func (m *Model) reviewURL(sel []int) (url, what string) {
+	if len(sel) == 1 {
+		if n := m.reviewPR(sel[0]); n > 0 {
+			if pr := m.prURL(sel[0]); pr != "" {
+				return pr + "/files", fmt.Sprintf("#%d", n)
+			}
+		}
+	}
+	bottom, top := m.snap.Branches[sel[0]], m.snap.Branches[sel[len(sel)-1]]
+	what = top.Name
+	if len(sel) > 1 {
+		what = bottom.Name + ".." + top.Name
+	}
+	if m.gh == nil || bottom.Parent == "" {
+		return "", what
+	}
+	repo := m.gh.Repository()
+	return fmt.Sprintf(
+		"https://%s/%s/%s/compare/%s...%s",
+		repo.Host, repo.Owner, repo.Name, bottom.Parent, top.Name,
+	), what
+}
+
 func (m *Model) startReview() tea.Cmd {
 	if m.snap == nil || len(m.snap.Branches) == 0 {
 		return nil
@@ -433,7 +460,14 @@ func (m *Model) startReview() tea.Cmd {
 		return m.setFlash("nothing selected to review", true)
 	}
 	command, note, err := m.reviewCommand(sel)
+	// GitHub needs no local refs, so a range that is not available locally
+	// can still open there. The range command's program decides.
+	probe := command
 	if err != nil {
+		probe = m.opts.ReviewCmd
+	}
+	place, missing := m.opts.Reviews.Where(probe)
+	if place != desktop.InBrowser && err != nil {
 		return m.setFlash("review: "+err.Error(), true)
 	}
 	var names []string
@@ -445,13 +479,24 @@ func (m *Model) startReview() tea.Cmd {
 		label = fmt.Sprintf("review %s +%d", shortBranch(names[len(names)-1]), len(names)-1)
 	}
 
-	m.clearSelection()
+	if place == desktop.InBrowser {
+		url, what := m.reviewURL(sel)
+		if url == "" {
+			why := "review: no page on GitHub for " + what
+			if missing != "" {
+				why = "review: " + missing + " not found, and no page on GitHub for " + what
+			}
+			return m.setFlash(why, true)
+		}
+		m.clearSelection()
+		return ui.BrowseReviews(missing, []string{url}, []string{what})
+	}
 
-	root := m.local.Dir()
-	tabs := desktop.NewTabs(desktop.TabTarget(m.opts.ReviewIn))
-	if tabs == nil {
+	m.clearSelection()
+	if place == desktop.Inline {
 		return m.runInteractive(label, "", "sh", "-c", command)
 	}
+	root, tabs := m.local.Dir(), m.opts.Reviews.Tabs
 	return func() tea.Msg {
 		if _, err := tabs.Open(root, label, command, true); err != nil {
 			return ui.FlashMsg{Text: "review: " + err.Error(), Err: true}

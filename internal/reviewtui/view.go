@@ -10,6 +10,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/drew-council/gh-stack-tui/internal/desktop"
 	"github.com/drew-council/gh-stack-tui/internal/github"
 	"github.com/drew-council/gh-stack-tui/internal/review"
 	"github.com/drew-council/gh-stack-tui/internal/ui"
@@ -812,13 +813,15 @@ func (m Model) footerText() string {
 
 // where names the place reviews open, for one PR or several.
 func (m Model) where(several bool) string {
-	if m.opts.Tabs == nil {
+	switch {
+	case m.place == desktop.InBrowser:
+		return "browser"
+	case m.place == desktop.Inline:
 		return "this terminal"
+	case several:
+		return m.opts.Reviews.Tabs.Noun() + "s"
 	}
-	if several {
-		return m.opts.Tabs.Noun() + "s"
-	}
-	return "a " + m.opts.Tabs.Noun()
+	return "a " + m.opts.Reviews.Tabs.Noun()
 }
 
 // --- help ---

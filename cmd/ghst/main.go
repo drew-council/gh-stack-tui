@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"os"
 	"time"
 
@@ -10,6 +9,7 @@ import (
 
 	"github.com/drew-council/gh-stack-tui/internal/cache"
 	"github.com/drew-council/gh-stack-tui/internal/demo"
+	"github.com/drew-council/gh-stack-tui/internal/desktop"
 	"github.com/drew-council/gh-stack-tui/internal/git"
 	"github.com/drew-council/gh-stack-tui/internal/stack"
 	"github.com/drew-council/gh-stack-tui/internal/stacktui"
@@ -23,17 +23,16 @@ func main() {
 
 func rootCmd() *cobra.Command {
 	var opts stacktui.Options
-	var dir string
+	var dir, reviewIn string
 	cmd := &cobra.Command{
 		Use:          "ghst",
 		Short:        "A terminal UI for gh-stack stacks",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		PersistentPreRunE: func(*cobra.Command, []string) error {
-			switch opts.ReviewIn {
-			case "auto", "herdr", "tmux", "inline":
-			default:
-				return errors.New("--review-in must be auto, herdr, tmux, or inline")
+			var err error
+			if opts.Reviews, err = desktop.NewReviews(reviewIn); err != nil {
+				return err
 			}
 			opts.RemoteInterval = max(opts.RemoteInterval, 5*time.Second)
 			opts.PollInterval = max(opts.PollInterval, 250*time.Millisecond)
@@ -69,10 +68,10 @@ func rootCmd() *cobra.Command {
 		"review command for a single branch with an open PR; {pr} becomes its number (empty: always review the range)",
 	)
 	f.StringVar(
-		&opts.ReviewIn,
+		&reviewIn,
 		"review-in",
 		"auto",
-		"where reviews open: auto, herdr, tmux, or inline",
+		"where reviews open: "+desktop.ReviewPlaces+"; reviews open on GitHub when the review command is not installed",
 	)
 
 	cmd.Flags().StringVarP(&dir, "dir", "C", ".", "run as if started in `dir`")
@@ -130,6 +129,10 @@ func runDemo(opts stacktui.Options) error {
 		return err
 	}
 	remote := &demo.Remote{Delay: 600 * time.Millisecond}
+	// Reviews run, and fail, like other commands, rather than opening the
+	// made-up PRs on GitHub.
+	opts.Reviews.Browser = false
+	opts.Reviews.Installed = func(string) bool { return true }
 	opts.Connect = func(string) (stacktui.Remote, error) { return remote, nil }
 	_, err = tea.NewProgram(stacktui.New(demo.NewSource(time.Now, dir), opts)).Run()
 	return err

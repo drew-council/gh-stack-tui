@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"os"
 	"time"
 
@@ -31,12 +30,10 @@ func rootCmd() *cobra.Command {
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		PersistentPreRunE: func(*cobra.Command, []string) error {
-			switch reviewIn {
-			case "auto", "herdr", "tmux", "inline":
-			default:
-				return errors.New("--review-in must be auto, herdr, tmux, or inline")
+			var err error
+			if opts.Reviews, err = desktop.NewReviews(reviewIn); err != nil {
+				return err
 			}
-			opts.Tabs = desktop.NewTabs(desktop.TabTarget(reviewIn))
 			opts.RemoteInterval = max(opts.RemoteInterval, 5*time.Second)
 			opts.PollInterval = max(opts.PollInterval, 250*time.Millisecond)
 			return nil
@@ -68,7 +65,7 @@ func rootCmd() *cobra.Command {
 		&reviewIn,
 		"review-in",
 		"auto",
-		"where reviews open: auto, herdr, tmux, or inline",
+		"where reviews open: "+desktop.ReviewPlaces+"; reviews open on GitHub when the review command is not installed",
 	)
 	f.BoolVar(&opts.Show.Drafts, "drafts", false, "keep draft PRs in the queue")
 	f.BoolVar(&opts.Show.Bots, "bots", false, "keep PRs opened by bots in the queue")
@@ -129,7 +126,7 @@ func runDemo(opts reviewtui.Options) error {
 	opts.Repo = remote.Repository()
 	opts.Connect = func() (reviewtui.Remote, error) { return remote, nil }
 	opts.Local = demo.Checkout{}
-	opts.Tabs = demo.NewTabs("#337")
+	opts.Reviews = demo.Reviews("#337")
 	_, err := tea.NewProgram(reviewtui.New(opts)).Run()
 	return err
 }

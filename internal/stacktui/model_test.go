@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/drew-council/gh-stack-tui/internal/demo"
 	"github.com/drew-council/gh-stack-tui/internal/git"
 	"github.com/drew-council/gh-stack-tui/internal/github"
 	"github.com/drew-council/gh-stack-tui/internal/stack"
@@ -316,6 +317,70 @@ func TestReviewSingleBranchWithPR(t *testing.T) {
 		if err != nil || got != c.want {
 			t.Errorf("%s: command = %q err=%v, want %q", c.name, got, err, c.want)
 		}
+	}
+}
+
+func TestReviewURL(t *testing.T) {
+	cases := []struct {
+		name      string
+		keys      []string
+		edit      func(*Model)
+		url, what string
+	}{
+		{"open PR", nil, nil, "https://github.com/o/r/pull/2/files", "#2"},
+		{
+			"no PR",
+			[]string{"K"},
+			nil,
+			"https://github.com/acme/auth-service/compare/two...three",
+			"three",
+		},
+		{
+			"several branches",
+			[]string{"v", "K"},
+			nil,
+			"https://github.com/acme/auth-service/compare/main...three", "two..three",
+		},
+		{"not connected", []string{"K"}, func(m *Model) { m.gh = nil }, "", "three"},
+	}
+	for _, c := range cases {
+		m := press(testModel(), c.keys...)
+		m.gh = &demo.Remote{}
+		if c.edit != nil {
+			c.edit(&m)
+		}
+		url, what := m.reviewURL(m.reviewSelection())
+		if url != c.url || what != c.what {
+			t.Errorf("%s: reviewURL = %q, %q, want %q, %q", c.name, url, what, c.url, c.what)
+		}
+	}
+}
+
+// Without the review command, and without a page on GitHub, nothing opens.
+func TestReviewWithoutToolOrPage(t *testing.T) {
+	m := press(testModel(), "K")
+	m.opts.Reviews.Installed = func(string) bool { return false }
+	(&m).startReview()
+	if !m.flashErr ||
+		!strings.Contains(m.flash, "tuicr not found, and no page on GitHub for three") {
+		t.Fatalf("flash %q", m.flash)
+	}
+}
+
+// GitHub needs no local refs, so a range missing locally still opens there.
+func TestReviewInBrowserWithoutLocalRange(t *testing.T) {
+	m := press(testModel(), "K")
+	m.gh = &demo.Remote{}
+	m.snap.Branches[2].Head = ""
+	m.opts.Reviews.Browser = true
+	if cmd := (&m).startReview(); cmd == nil || m.flashErr {
+		t.Fatalf("flash %q", m.flash)
+	}
+	m.opts.Reviews.Browser = false
+	m.opts.Reviews.Installed = func(string) bool { return true }
+	(&m).startReview()
+	if !m.flashErr || !strings.Contains(m.flash, "not available locally") {
+		t.Fatalf("flash %q", m.flash)
 	}
 }
 

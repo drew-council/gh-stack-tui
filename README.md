@@ -17,7 +17,7 @@ Both are built from the same packages, look alike, and share a cache.
 - **Vim-style keys throughout.** Arrow keys also work.
 - **Catppuccin Mocha** colors, with the stack drawn as a tree like `gh stack view`.
 - **Copying** the hovered file path, commit SHA, branch name, or URL.
-- **Review:** select layers of the stack and open their combined commit range in [tuicr](https://github.com/agavra/tuicr), or a single layer's PR, in a new herdr tab, a new tmux window, or inline.
+- **Review:** select layers of the stack and open their combined commit range in [tuicr](https://github.com/agavra/tuicr), or a single layer's PR, in a new herdr tab, a new tmux window, or inline. Without tuicr, the changes open on GitHub.
 
 ### Usage
 
@@ -81,7 +81,7 @@ A selection of marked branches, or the visual range, is used by `R`, `D`, `A`, `
 
 #### Review
 
-`R` reviews the marked branches, or the visual range, or the hovered branch if nothing is selected. The stack is linear, so the selection becomes a single `base..head` range from the bottom selected layer to the top one. It then runs `--review-cmd` with `{range}` filled in. When the selection is a single branch with an open PR, whether draft or ready, `--review-pr-cmd` runs instead with `{pr}` set to the PR number, so tuicr reviews the PR and comments can be submitted to it. Pass `--review-pr-cmd ''` to always review the range. By default that opens a new herdr tab when running inside herdr (`HERDR_ENV=1`), a new tmux window inside tmux, and otherwise suspends the TUI while the review runs. Use `--review-in` to force one of these.
+`R` reviews the marked branches, or the visual range, or the hovered branch if nothing is selected. The stack is linear, so the selection becomes a single `base..head` range from the bottom selected layer to the top one. It then runs `--review-cmd` with `{range}` filled in. When the selection is a single branch with an open PR, whether draft or ready, `--review-pr-cmd` runs instead with `{pr}` set to the PR number, so tuicr reviews the PR and comments can be submitted to it. Pass `--review-pr-cmd ''` to always review the range. By default that opens a new herdr tab when running inside herdr (`HERDR_ENV=1`), a new tmux window inside tmux, and otherwise suspends the TUI while the review runs. When the review command's program is not installed, the review opens on GitHub instead: the PR's files for a single branch with an open PR, and otherwise a comparison of the bottom layer's parent with the top layer, as pushed. Use `--review-in` to force one of these, or `--review-in browser` to always use GitHub.
 
 #### Reviewers
 
@@ -173,7 +173,7 @@ Some requests are not yours to act on now, and the queue leaves them out: drafts
 
 `enter` with a selection, or on a stack's header, opens every pull request the same way. Tabs open in the order to review them: groups as listed, and each stack from the bottom up. Pull requests that already have a tab are skipped.
 
-Tabs are herdr tabs inside herdr (`HERDR_ENV=1`) and tmux windows inside tmux. Elsewhere, or with `--review-in inline`, the queue is suspended while the reviews run one after another. Open tabs are checked every two seconds, so a tab you close loses its mark.
+Tabs are herdr tabs inside herdr (`HERDR_ENV=1`) and tmux windows inside tmux. Elsewhere, or with `--review-in inline`, the queue is suspended while the reviews run one after another. When the review command's program is not installed, or with `--review-in browser`, the PRs' files open on GitHub instead. Open tabs are checked every two seconds, so a tab you close loses its mark.
 
 Review commands run at the top of the repository.
 

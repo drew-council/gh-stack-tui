@@ -34,8 +34,8 @@ func (m Model) detailTitle() (title, info string) {
 	}
 	it := g.Items[r.item]
 	title = s.Title.Render(fmt.Sprintf("#%d", it.Number))
-	if _, open := m.tabs[it.Number]; open && m.opts.Tabs != nil {
-		info = s.Bot.Render("▎open in a " + m.opts.Tabs.Noun())
+	if _, open := m.tabs[it.Number]; open && m.opts.Reviews.Tabs != nil {
+		info = s.Bot.Render("▎open in a " + m.opts.Reviews.Tabs.Noun())
 	}
 	return title, info
 }

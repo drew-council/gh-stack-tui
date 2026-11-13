@@ -10,7 +10,7 @@ Agents MAY update this file without asking. When a change makes something here w
 - `internal/stacktui`: `ghst`'s model, key handling, and rendering.
 - `internal/reviewtui`: `ghrv`'s model, key handling, and rendering.
 - `internal/ui`: what the TUIs share: the palette and styles, panels, key hints, the help screen, Markdown rendering, and the clipboard and browser commands. `internal/ui/uitest` compares screens to golden files.
-- `internal/desktop`: the clipboard, the browser, and herdr and tmux tabs.
+- `internal/desktop`: the clipboard, the browser, herdr and tmux tabs, and where reviews open.
 - `internal/github`: GraphQL and REST queries: PR, CI, and reviewer state for `ghst`, the review queue and GitHub's stacks for `ghrv`.
 - `internal/review`: what each PR of a review queue needs from the viewer, and how the queue groups into stacks. No I/O.
 - `internal/cache`: SQLite cache of GitHub results, generated with sqlc. Both programs use the same file.
@@ -19,7 +19,9 @@ Agents MAY update this file without asking. When a change makes something here w
 
 Code both TUIs need goes in `internal/ui` or `internal/desktop`, not in one TUI's package. A TUI package MUST NOT import the other.
 
-`ghst`'s model reads stacks through the `Local` interface and PRs through `Remote` (`internal/stacktui/sources.go`). `ghrv`'s model reads its queue through its own `Remote` (`internal/reviewtui/sources.go`) and opens reviews through `desktop.Tabs`. `stack.Source`, `github.Client`, and the herdr and tmux tabs are the real ones and `internal/demo` the fake ones. A model MUST NOT check for the demo. Add a method to an interface instead.
+Both TUIs ask `desktop.Reviews` where a review opens: a tab, the TUI's own terminal, or GitHub when the review command's program is not on PATH. It checks at the moment of the review, so installing tuicr takes effect without a restart. Tests MUST set `Reviews.Installed`, or they depend on the machine's PATH.
+
+`ghst`'s model reads stacks through the `Local` interface and PRs through `Remote` (`internal/stacktui/sources.go`). `ghrv`'s model reads its queue through its own `Remote` (`internal/reviewtui/sources.go`) and opens reviews through `desktop.Reviews`. `stack.Source`, `github.Client`, and the herdr and tmux tabs are the real ones and `internal/demo` the fake ones. A model MUST NOT check for the demo. Add a method to an interface instead.
 
 GitHub does not say which files are generated. `ghrv` asks the checkout through `Local`, as `ghst` does through `git.Repo`, and flags the files when their details load. Line and file counts on screen MUST come from `Model.size`, not from the PR's own totals.
 

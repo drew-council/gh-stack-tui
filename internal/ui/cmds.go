@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"strings"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/drew-council/gh-stack-tui/internal/desktop"
@@ -38,6 +40,17 @@ func OpenURLs(urls []string, what string) tea.Cmd {
 		}
 		return FlashMsg{Text: what}
 	}
+}
+
+// BrowseReviews opens reviews on GitHub, for when [desktop.Reviews] puts them
+// in the browser. urls show the changes and labels name them. missing is the
+// program that could not run, if that is why.
+func BrowseReviews(missing string, urls, labels []string) tea.Cmd {
+	what := "opened " + strings.Join(labels, ", ") + " on GitHub"
+	if missing != "" {
+		what = missing + " not found: " + what
+	}
+	return OpenURLs(urls, what)
 }
 
 // OpenURL opens url in the browser and flashes it.

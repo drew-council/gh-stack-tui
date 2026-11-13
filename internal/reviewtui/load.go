@@ -12,13 +12,16 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/drew-council/gh-stack-tui/internal/cache"
+	"github.com/drew-council/gh-stack-tui/internal/desktop"
 	"github.com/drew-council/gh-stack-tui/internal/github"
 	"github.com/drew-council/gh-stack-tui/internal/review"
 )
 
 type (
-	pollTickMsg   struct{}
-	remoteTickMsg struct{}
+	pollTickMsg struct{}
+	// placeCheckedMsg is where a review opens, as a poll found.
+	placeCheckedMsg struct{ place desktop.Place }
+	remoteTickMsg   struct{}
 
 	// cachedLoadedMsg is what the cache knew about the queue at startup.
 	cachedLoadedMsg struct {
@@ -334,12 +337,22 @@ func (m Model) applyDetails(msg detailsLoadedMsg) (tea.Model, tea.Cmd) {
 	}))
 }
 
+// checkPlace looks up again where a review opens, in case the review command
+// was installed or removed.
+func (m *Model) checkPlace() tea.Cmd {
+	reviews, command := m.opts.Reviews, m.opts.ReviewCmd
+	return func() tea.Msg {
+		place, _ := reviews.Where(command)
+		return placeCheckedMsg{place: place}
+	}
+}
+
 // tabLabel names the tab that reviews PR number.
 func tabLabel(number int) string { return "#" + strconv.Itoa(number) }
 
 // loadTabs lists the open tabs, to mark the PRs under review.
 func (m *Model) loadTabs() tea.Cmd {
-	tabs := m.opts.Tabs
+	tabs := m.opts.Reviews.Tabs
 	if tabs == nil {
 		return nil
 	}

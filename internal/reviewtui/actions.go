@@ -9,6 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/drew-council/gh-stack-tui/internal/desktop"
 	"github.com/drew-council/gh-stack-tui/internal/github"
 	"github.com/drew-council/gh-stack-tui/internal/review"
 	"github.com/drew-council/gh-stack-tui/internal/ui"
@@ -39,7 +40,8 @@ func (m *Model) command(pr *github.ReviewPR) string {
 // startReview opens the PRs under review, each in a tab behind the TUI, in
 // the order to review them: the queue stays in front, to keep picking from.
 // Only a tab that is already open takes the focus: enter on its PR goes to
-// it. Without tabs, reviews run here one after another.
+// it. Without tabs, reviews run here one after another. When the review
+// command is not installed, the PRs open on GitHub instead.
 func (m *Model) startReview() tea.Cmd {
 	if r, ok := m.hovered(); ok && r.kind == rowFold && len(m.selection()) == 0 {
 		m.expand()
@@ -64,8 +66,18 @@ func (m *Model) startReview() tea.Cmd {
 	m.clearSelection()
 	m.rebuild()
 
-	tabs, dir := m.opts.Tabs, m.opts.Dir
-	if tabs == nil {
+	place, missing := m.opts.Reviews.Where(m.opts.ReviewCmd)
+	m.place = place
+	tabs, dir := m.opts.Reviews.Tabs, m.opts.Dir
+	switch place {
+	case desktop.InBrowser:
+		var urls, labels []string
+		for _, it := range open {
+			urls = append(urls, it.PR.URL+"/files")
+			labels = append(labels, fmt.Sprintf("#%d", it.Number))
+		}
+		return ui.BrowseReviews(missing, urls, labels)
+	case desktop.Inline:
 		var commands []string
 		for _, it := range open {
 			commands = append(commands, m.command(it.PR))
@@ -116,8 +128,8 @@ func (m Model) applyOpened(msg reviewOpenedMsg) (tea.Model, tea.Cmd) {
 		numbers = append(numbers, fmt.Sprintf("#%d", n))
 	}
 	noun := "tab"
-	if m.opts.Tabs != nil {
-		noun = m.opts.Tabs.Noun()
+	if m.opts.Reviews.Tabs != nil {
+		noun = m.opts.Reviews.Tabs.Noun()
 	}
 	var text string
 	switch n := len(msg.opened); {
