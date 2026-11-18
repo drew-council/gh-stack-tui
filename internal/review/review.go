@@ -133,8 +133,12 @@ func Classify(pr *github.ReviewPR) (Need, string) {
 	if pr.Requested {
 		switch {
 		// GitHub drops a request by name once the person reviews, so a
-		// standing one was made after the review. A team's request stays.
-		case pr.Direct || pr.AskedAt.After(m.At):
+		// standing one was made after the review.
+		case pr.Direct:
+			return NeedReReview, "asked again"
+		// A team asked after an approval is CODEOWNERS answering a push, and
+		// the approval still counts for the team.
+		case m.State != "APPROVED" && pr.AskedAt.After(m.At):
 			return NeedReReview, "asked again"
 		case m.State == "DISMISSED":
 			return NeedReReview, "review dismissed"

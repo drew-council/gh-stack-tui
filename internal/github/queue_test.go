@@ -70,10 +70,10 @@ const requestedPR = `{
 		{"state": "APPROVED", "submittedAt": "2026-10-02T10:00:00Z",
 			"author": {"__typename": "User", "login": "cat"}},
 		{"state": "CHANGES_REQUESTED", "submittedAt": "2026-10-02T11:00:00Z",
-			"author": {"__typename": "User", "login": "me"}}
+			"commit": {"oid": "old7"}, "author": {"__typename": "User", "login": "me"}}
 	]},
-	"viewerLatestReview": {"state": "CHANGES_REQUESTED",
-		"submittedAt": "2026-10-02T11:00:00Z", "commit": {"oid": "old7"}},
+	"viewerLatestReview": {"state": "COMMENTED",
+		"submittedAt": "2026-10-03T09:10:00Z", "commit": {"oid": "head7"}},
 	"timelineItems": {"nodes": [
 		{"createdAt": "2026-10-01T10:00:00Z", "actor": {"login": "amy"},
 			"requestedReviewer": {"__typename": "Team", "slug": "go"}},
@@ -150,6 +150,7 @@ func TestFetchQueue(t *testing.T) {
 		seven.AskedBy != "dan" {
 		t.Fatalf("#7 asked %v by %q", seven.AskedAt, seven.AskedBy)
 	}
+	// A later comment leaves the change request standing.
 	if seven.Mine == nil || seven.Mine.State != "CHANGES_REQUESTED" ||
 		seven.Mine.Commit != "old7" ||
 		len(seven.Reviews) != 1 ||

@@ -108,7 +108,8 @@ type ReviewPR struct {
 	// Reviews are the latest approval or change request of each reviewer
 	// other than the viewer.
 	Reviews []Review
-	// Mine is the viewer's latest review, or nil.
+	// Mine is the viewer's latest approval or change request, or failing
+	// that their latest review, or nil.
 	Mine *Review
 }
 
@@ -175,7 +176,8 @@ const queueFields = `number url title state isDraft merged reviewDecision mergea
   commits(last: 1) { totalCount nodes { commit { committedDate statusCheckRollup { state } } } }
   reviewRequests(first: 25) { nodes { requestedReviewer {
     __typename ... on User { login } ... on Team { slug } } } }
-  latestOpinionatedReviews(first: 25) { nodes { state submittedAt author { __typename login } } }
+  latestOpinionatedReviews(first: 25) { nodes { state submittedAt commit { oid }
+    author { __typename login } } }
   viewerLatestReview { state submittedAt commit { oid } }
   timelineItems(last: 20, itemTypes: [REVIEW_REQUESTED_EVENT]) { nodes {
     ... on ReviewRequestedEvent { createdAt actor { login } requestedReviewer {
@@ -237,7 +239,10 @@ type queueNode struct {
 		Nodes []struct {
 			State       string    `json:"state"`
 			SubmittedAt time.Time `json:"submittedAt"`
-			Author      *actor    `json:"author"`
+			Commit      *struct {
+				OID string `json:"oid"`
+			} `json:"commit"`
+			Author *actor `json:"author"`
 		} `json:"nodes"`
 	} `json:"latestOpinionatedReviews"`
 	ViewerLatestReview *struct {
@@ -311,14 +316,20 @@ func (n *queueNode) toReviewPR(viewer string, teams []string) *ReviewPR {
 		}
 	}
 	slices.Sort(pr.Via)
+	var opinion *Review
 	for _, r := range n.LatestOpinionatedReviews.Nodes {
-		if r.Author == nil || r.Author.Login == viewer {
+		if r.Author == nil {
 			continue
 		}
-		pr.Reviews = append(
-			pr.Reviews,
-			Review{Login: r.Author.Login, State: r.State, At: r.SubmittedAt},
-		)
+		rv := Review{Login: r.Author.Login, State: r.State, At: r.SubmittedAt}
+		if r.Commit != nil {
+			rv.Commit = r.Commit.OID
+		}
+		if r.Author.Login == viewer {
+			opinion = &rv
+			continue
+		}
+		pr.Reviews = append(pr.Reviews, rv)
 	}
 	if r := n.ViewerLatestReview; r != nil {
 		pr.Mine = &Review{Login: viewer, State: r.State}
@@ -328,6 +339,12 @@ func (n *queueNode) toReviewPR(viewer string, teams []string) *ReviewPR {
 		if r.Commit != nil {
 			pr.Mine.Commit = r.Commit.OID
 		}
+	}
+	// A comment or an unsubmitted review leaves an approval or change request
+	// standing, as GitHub's review decision does.
+	if opinion != nil &&
+		(pr.Mine == nil || pr.Mine.State == "COMMENTED" || pr.Mine.State == "PENDING") {
+		pr.Mine = opinion
 	}
 	// The events are oldest first.
 	for _, e := range slices.Backward(n.TimelineItems.Nodes) {

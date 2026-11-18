@@ -38,12 +38,21 @@ func TestClassify(t *testing.T) {
 			NeedReReview, "asked again",
 		},
 		{
-			"asked again after approving",
+			"asked by name again after approving",
 			github.ReviewPR{
-				Requested: true, HeadSHA: "a", AskedAt: ago(time.Hour),
+				Requested: true, Direct: true, HeadSHA: "a", AskedAt: ago(time.Hour),
 				Mine: mine("APPROVED", 2*time.Hour, "a"),
 			},
 			NeedReReview, "asked again",
+		},
+		{
+			// CODEOWNERS asks the team again when a push touches its files.
+			"a team asked after the viewer approved",
+			github.ReviewPR{
+				Requested: true, HeadSHA: "b", AskedAt: ago(time.Hour),
+				Mine: mine("APPROVED", 2*time.Hour, "a"),
+			},
+			NeedApproved, "",
 		},
 		{
 			// GitHub drops a request by name on review, so it was made since.

@@ -30,6 +30,8 @@ GitHub does not say which files are generated. `ghrv` asks the checkout through 
 
 `ghrv` learns stacks from GitHub's stacks API, not from the local gh-stack file: the stacks are other people's. The queue's query is cheap on purpose, and `FetchReviewDetails` fetches the costly parts per PR, only when a PR's `Version` changes.
 
+When `ghrv` brings a PR back for re-review (`review.Classify`): GitHub drops a request by name when the person reviews, and a team's when a member reviews. CODEOWNERS requests a team again when a push touches its files, so a team request after the viewer's approval MUST NOT count as being asked again. `viewerLatestReview` includes comments, so `Mine` prefers the viewer's latest approval or change request.
+
 ## Testing
 
 Run `go test ./...` before finishing a change.
