@@ -7,3 +7,10 @@ sql:
       go:
         package: cachedb
         out: internal/cache/cachedb
+  - engine: sqlite
+    schema: internal/state/migrations
+    queries: internal/state/queries.sql
+    gen:
+      go:
+        package: statedb
+        out: internal/state/statedb

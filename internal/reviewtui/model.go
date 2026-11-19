@@ -3,6 +3,7 @@
 package reviewtui
 
 import (
+	"cmp"
 	"time"
 
 	"charm.land/bubbles/v2/spinner"
@@ -43,6 +44,10 @@ type Options struct {
 	// why it is not set.
 	Cache    *cache.Cache
 	CacheErr error
+	// Snoozes keeps what the viewer snoozed. SnoozesErr is why it is not
+	// set; without it, nothing can be snoozed.
+	Snoozes    SnoozeStore
+	SnoozesErr error
 	// Theme picks the colors.
 	Theme ui.Theme
 }
@@ -53,6 +58,7 @@ const (
 	modeNormal mode = iota
 	modeFilter
 	modeHelp
+	modeSnooze
 )
 
 // Model is the root Bubble Tea model.
@@ -66,6 +72,15 @@ type Model struct {
 	groups []review.Group
 	// teams are short names of the viewer's teams.
 	teams map[string]string
+	// snoozes are what the viewer snoozed, as last read, and nextWake when
+	// the soonest of them wakes, to bring it back on time.
+	snoozes  review.Snoozes
+	nextWake time.Time
+	// snoozeSeq counts the snoozes made and ended here. A read that started
+	// before the last of them may have missed it, and is dropped.
+	snoozeSeq int
+	// snooze is the open snooze dialog.
+	snooze *snoozeDialog
 	// details are the details of the PRs looked at so far, by number, and
 	// loadingDetails the ones being fetched.
 	details        map[int]cache.Detail
@@ -180,9 +195,14 @@ func (m Model) Init() tea.Cmd {
 		remoteTick(m.opts.RemoteInterval),
 		m.opts.Theme.Request(),
 	}
-	if err := m.opts.CacheErr; err != nil {
+	// A snooze error outlasts a cache error: snoozes are not best effort.
+	if err := cmp.Or(m.opts.SnoozesErr, m.opts.CacheErr); err != nil {
+		what := "cache"
+		if err == m.opts.SnoozesErr {
+			what = "snoozes"
+		}
 		cmds = append(cmds, func() tea.Msg {
-			return ui.FlashMsg{Text: "cache: " + ui.FirstLine(err.Error()), Err: true}
+			return ui.FlashMsg{Text: what + ": " + ui.FirstLine(err.Error()), Err: true}
 		})
 	}
 	return tea.Batch(cmds...)
@@ -236,7 +256,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case pollTickMsg:
-		return m, tea.Batch(m.loadTabs(), m.checkPlace(), pollTick(m.opts.PollInterval))
+		return m, tea.Batch(
+			m.loadTabs(), m.checkPlace(), m.wakeDue(), pollTick(m.opts.PollInterval),
+		)
 
 	case placeCheckedMsg:
 		m.place = msg.place
@@ -286,6 +308,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.input, cmd = m.input.Update(msg)
 		m.setFilter(m.input.Value())
+		return m, cmd
+	}
+	if m.mode == modeSnooze {
+		var cmd tea.Cmd
+		m.snooze.input, cmd = m.snooze.input.Update(msg)
 		return m, cmd
 	}
 	return m, nil

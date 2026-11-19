@@ -27,6 +27,7 @@ func newDemo(t *testing.T, width, height int) (Model, *demo.ReviewRemote) {
 		ReviewCmd: "tuicr pr {url}",
 		Local:     demo.Checkout{},
 		Reviews:   demo.Reviews("#337"),
+		Snoozes:   &demo.Snoozes{},
 		Connect:   func() (Remote, error) { return remote, nil },
 	})
 	m.now = func() time.Time { return testNow }
@@ -103,6 +104,10 @@ func press(t *testing.T, m Model, keys ...string) Model {
 			msg = tea.KeyPressMsg{Code: tea.KeySpace, Text: " "}
 		case "ctrl+d":
 			msg = tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl}
+		case "down":
+			msg = tea.KeyPressMsg{Code: tea.KeyDown}
+		case "up":
+			msg = tea.KeyPressMsg{Code: tea.KeyUp}
 		default:
 			msg = tea.KeyPressMsg{Code: []rune(k)[0], Text: k}
 		}
@@ -276,4 +281,20 @@ func TestRenderNothing(t *testing.T) {
 		t,
 		loadQueue(t, m, remote, &github.Queue{Viewer: demo.Viewer, Trunk: "main"}, time.Second),
 	)
+}
+
+// TestRenderSnoozeDialog asks how long to snooze the hovered PR.
+func TestRenderSnoozeDialog(t *testing.T) {
+	assertScreen(t, press(t, demoModel(t, 200, 50), "z", "down", "down"))
+}
+
+// TestRenderSnoozeTyped previews a typed duration, and the presets give way.
+func TestRenderSnoozeTyped(t *testing.T) {
+	assertScreen(t, typed(t, press(t, onPR(t, demoModel(t, 160, 40), 303), "z"), "1d12h"))
+}
+
+// TestRenderSnoozedStack shows a snoozed stack among the hidden PRs.
+func TestRenderSnoozedStack(t *testing.T) {
+	m := press(t, onPR(t, demoModel(t, 200, 50), 305), "[", "z", "enter", ".")
+	assertScreen(t, press(t, onPR(t, m, 305), "["))
 }

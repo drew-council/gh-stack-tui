@@ -37,7 +37,7 @@
           inherit version;
           src = ./.;
           nativeBuildInputs = [ pkgs.git ];
-          vendorHash = "sha256-UuAO8xkmPUQrLqUq+iMMhaHGaVBBDd+s77FeCt7Hgjo=";
+          vendorHash = "sha256-b0h53xqEeXRnXA8DA2+5Cx18nO4UrjNyIx0qAZHJbYQ=";
           # The gh-stack shim is its own module; see third_party/gh-stack.
           excludedPackages = [ "third_party" ];
         };
@@ -82,7 +82,7 @@
 
         formatter = treefmtEval.config.build.wrapper;
         checks.formatting = treefmtEval.config.build.check self;
-        # The generated cache queries match queries.sql and schema.sql.
+        # The generated cache and state queries match their SQL.
         checks.sqlc = pkgs.runCommand "sqlc-diff" { nativeBuildInputs = [ pkgs.sqlc ]; } ''
           cd ${./.}
           sqlc diff

@@ -7,6 +7,7 @@ import (
 	"maps"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/drew-council/gh-stack-tui/internal/github"
 )
@@ -37,6 +38,9 @@ const (
 	HideBot
 	HideWaiting
 	HideApproved
+	// HideSnoozed: the viewer snoozed the PR or its stack, and it has not
+	// woken yet.
+	HideSnoozed
 )
 
 // String names the reason, as the queue counts it.
@@ -50,6 +54,8 @@ func (h Hidden) String() string {
 		return "waiting"
 	case HideApproved:
 		return "approved"
+	case HideSnoozed:
+		return "snoozed"
 	}
 	return ""
 }
@@ -74,6 +80,9 @@ type Item struct {
 	// Base is the number of the open pull request this one is based on, when
 	// its base is the branch of another PR of the queue rather than trunk.
 	Base int
+	// Wakes is when a snoozed PR comes back. It is zero unless Hidden is
+	// HideSnoozed.
+	Wakes time.Time
 }
 
 // ForYou reports whether the PR waits on the viewer now.
@@ -89,6 +98,9 @@ type Group struct {
 	Items []Item
 	// Author opened the group's requested pull requests.
 	Author string
+	// Wakes is when a snoozed stack comes back, and zero while it is not
+	// snoozed.
+	Wakes time.Time
 }
 
 // ForYou counts the PRs of the group that wait on the viewer.

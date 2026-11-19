@@ -28,6 +28,10 @@ type (
 		queue   *github.Queue
 		at      time.Time
 		details map[int]cache.Detail
+		// snoozes is nil when they could not be read. snoozeSeq is
+		// Model.snoozeSeq when the read started.
+		snoozes   review.Snoozes
+		snoozeSeq int
 	}
 
 	remoteLoadedMsg struct {
@@ -35,6 +39,10 @@ type (
 		queue  *github.Queue
 		at     time.Time
 		err    error
+		// snoozes are read along with the queue, to take in what other TUIs
+		// snoozed. It is nil when they could not be read.
+		snoozes   review.Snoozes
+		snoozeSeq int
 	}
 
 	detailsLoadedMsg struct {
@@ -79,6 +87,7 @@ func (m *Model) loadCached() tea.Cmd {
 		return nil
 	}
 	c, repo, query, local := m.opts.Cache, m.opts.Repo, m.opts.Query, m.opts.Local
+	snoozes, seq := m.readSnoozes(), m.snoozeSeq
 	return func() tea.Msg {
 		queue, at, err := c.Queue(repo, query)
 		if err != nil || queue == nil {
@@ -93,7 +102,25 @@ func (m *Model) loadCached() tea.Cmd {
 		for _, d := range details {
 			markGenerated(local, d.Detail)
 		}
-		return cachedLoadedMsg{queue: queue, at: at, details: details}
+		return cachedLoadedMsg{
+			queue: queue, at: at, details: details, snoozes: snoozes(), snoozeSeq: seq,
+		}
+	}
+}
+
+// readSnoozes returns a function that reads the snoozes, or nil when they
+// cannot be read. It reads them again each time it is called.
+func (m *Model) readSnoozes() func() review.Snoozes {
+	store, repo, now := m.opts.Snoozes, m.opts.Repo, m.now
+	return func() review.Snoozes {
+		if store == nil {
+			return nil
+		}
+		s, err := store.Snoozes(repo, now())
+		if err != nil {
+			return nil
+		}
+		return s
 	}
 }
 
@@ -107,6 +134,9 @@ func (m Model) applyCached(msg cachedLoadedMsg) (tea.Model, tea.Cmd) {
 	// GitHub answering first leaves nothing for the cache to fill in.
 	if m.queue != nil {
 		return m, nil
+	}
+	if msg.snoozes != nil && msg.snoozeSeq == m.snoozeSeq {
+		m.snoozes = msg.snoozes
 	}
 	m.cachedAt = msg.at
 	m.setQueue(msg.queue)
@@ -125,16 +155,20 @@ func (m *Model) requestRemote() tea.Cmd {
 
 func (m *Model) loadRemote() tea.Cmd {
 	client, connect, query := m.gh, m.opts.Connect, m.opts.Query
+	snoozes, seq := m.readSnoozes(), m.snoozeSeq
 	return func() tea.Msg {
 		if client == nil {
 			var err error
 			if client, err = connect(); err != nil {
-				return remoteLoadedMsg{err: err}
+				return remoteLoadedMsg{err: err, snoozes: snoozes(), snoozeSeq: seq}
 			}
 		}
 		at := time.Now()
 		queue, err := client.FetchQueue(context.Background(), query)
-		return remoteLoadedMsg{client: client, queue: queue, at: at, err: err}
+		return remoteLoadedMsg{
+			client: client, queue: queue, at: at, err: err,
+			snoozes: snoozes(), snoozeSeq: seq,
+		}
 	}
 }
 
@@ -149,7 +183,13 @@ func (m Model) applyRemote(msg remoteLoadedMsg) (tea.Model, tea.Cmd) {
 		m.gh = msg.client
 	}
 	m.remoteErr = msg.err
+	if msg.snoozes != nil && msg.snoozeSeq == m.snoozeSeq {
+		m.snoozes = msg.snoozes
+	}
 	if msg.err != nil {
+		if m.queue != nil {
+			m.setQueue(m.queue)
+		}
 		return m, tea.Batch(cmds...)
 	}
 
@@ -163,7 +203,7 @@ func (m Model) applyRemote(msg remoteLoadedMsg) (tea.Model, tea.Cmd) {
 	m.failedDetails = map[int]string{}
 	m.setQueue(msg.queue)
 	if before != nil {
-		cmds = append(cmds, m.announce(before))
+		cmds = append(cmds, m.announce(before, false))
 	}
 
 	queue, at := msg.queue, msg.at
@@ -187,7 +227,8 @@ func (m *Model) waiting() map[int]struct{} {
 }
 
 // announce flashes the PRs that wait on the viewer now and did not before.
-func (m *Model) announce(before map[int]struct{}) tea.Cmd {
+// woke says they come back from a snooze rather than from GitHub.
+func (m *Model) announce(before map[int]struct{}, woke bool) tea.Cmd {
 	var arrived []review.Item
 	seen := map[int]struct{}{}
 	for _, g := range m.groups {
@@ -200,20 +241,38 @@ func (m *Model) announce(before map[int]struct{}) tea.Cmd {
 			}
 		}
 	}
+	one, several := "new: #%d %s", "%d new review requests"
+	if woke {
+		one, several = "awake: #%d %s", "%d snoozed PRs are back"
+	}
 	switch len(arrived) {
 	case 0:
 		return nil
 	case 1:
 		it := arrived[0]
-		return m.setFlash(fmt.Sprintf("new: #%d %s", it.Number, it.PR.Title), false)
+		return m.setFlash(fmt.Sprintf(one, it.Number, it.PR.Title), false)
 	}
-	return m.setFlash(fmt.Sprintf("%d new review requests", len(arrived)), false)
+	return m.setFlash(fmt.Sprintf(several, len(arrived)), false)
+}
+
+// wakeDue brings back the snoozed PRs whose time has come. GitHub may be
+// out of reach, so it does not wait for the next refresh.
+func (m *Model) wakeDue() tea.Cmd {
+	if m.queue == nil || m.nextWake.IsZero() || m.now().Before(m.nextWake) {
+		return nil
+	}
+	before := m.waiting()
+	m.setQueue(m.queue)
+	return m.announce(before, true)
 }
 
 // setQueue shows queue, keeping the cursor, the marks, and what is expanded.
 func (m *Model) setQueue(queue *github.Queue) {
 	m.queue = queue
 	m.groups = review.Build(queue, m.opts.Show)
+	now := m.now()
+	m.snoozes.Apply(m.groups, now)
+	m.nextWake = m.snoozes.Next(now)
 
 	teams := append([]string(nil), queue.Teams...)
 	present := map[int]struct{}{}

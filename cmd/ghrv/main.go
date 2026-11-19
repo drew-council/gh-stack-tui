@@ -14,6 +14,7 @@ import (
 	"github.com/drew-council/gh-stack-tui/internal/git"
 	"github.com/drew-council/gh-stack-tui/internal/github"
 	"github.com/drew-council/gh-stack-tui/internal/reviewtui"
+	"github.com/drew-council/gh-stack-tui/internal/state"
 )
 
 func main() {
@@ -125,8 +126,19 @@ func run(dir string, opts reviewtui.Options) error {
 		opts.Cache, err = cache.Open(cacheDir)
 	}
 	opts.CacheErr = err
+	// Without the state, nothing can be snoozed.
+	stateDir, err := state.Dir()
+	var store *state.Store
+	if err == nil {
+		store, err = state.Open(stateDir)
+	}
+	if err == nil {
+		opts.Snoozes = store
+	}
+	opts.SnoozesErr = err
 	_, err = tea.NewProgram(reviewtui.New(opts)).Run()
 	opts.Cache.Close()
+	store.Close()
 	return err
 }
 
@@ -138,6 +150,7 @@ func runDemo(opts reviewtui.Options) error {
 	opts.Connect = func() (reviewtui.Remote, error) { return remote, nil }
 	opts.Local = demo.Checkout{}
 	opts.Reviews = demo.Reviews("#337")
+	opts.Snoozes = &demo.Snoozes{}
 	_, err := tea.NewProgram(reviewtui.New(opts)).Run()
 	return err
 }

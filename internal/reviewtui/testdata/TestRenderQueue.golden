@@ -47,4 +47,4 @@
  │                                                                                                                                  ││ M internal/gateway/handlers/login.go                     +22 -14 │
  │                                                                                                                                  ││ M internal/gateway/handlers/logout.go                      +9 -7 │
  ╰─────────────────────────────────────────────────────────────────────────────── hidden: 1 draft · 1 bot · 1 waiting · 1 approved ─╯╰───────────────────────────────────────────────────────────── ↓4 ─╯
-  j/k move  enter review in a demo tab  space mark  o browser  y copy URL  J/K scroll details  [ ] groups  . hidden  / filter  ? help
+  j/k move  enter review in a demo tab  space mark  z snooze  o browser  y copy URL  J/K scroll details  [ ] groups  . hidden  / filter  ? help

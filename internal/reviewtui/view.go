@@ -89,6 +89,15 @@ func (m Model) render() string {
 			lines = append(lines, left[i]+right[i])
 		}
 	}
+	if m.mode == modeSnooze {
+		// The dialog sits over the queue, a third of the way down.
+		listW, _ := m.layout()
+		w := min(64, listW-4)
+		box := m.snoozeLines(w)
+		top := len(m.noteLines())
+		y := top + max(1, (h+2-len(box))/3)
+		lines = m.overlay(lines, box, (listW-w)/2, y)
+	}
 	lines = append(lines, " "+m.footerText())
 	for i, l := range lines {
 		lines[i] = ansi.Truncate(l, m.width, "…")
@@ -252,7 +261,8 @@ func (m Model) queueFoot() string {
 		var kinds []string
 		total := 0
 		for _, h := range []review.Hidden{
-			review.HideDraft, review.HideBot, review.HideWaiting, review.HideApproved,
+			review.HideSnoozed, review.HideDraft, review.HideBot, review.HideWaiting,
+			review.HideApproved,
 		} {
 			if n := hidden[h]; n > 0 {
 				total += n
@@ -398,7 +408,7 @@ func (m Model) emptyLines() []string {
 			"",
 			" " + s.OK.Render("✓") + s.Normal.Render(" Nothing waits on your review."),
 			" " + s.Dim.Render("  "+ui.Plural(n, "request is", "requests are")+
-				" left out as drafts, bots, or already reviewed. Press . to show them."),
+				" left out as drafts, bots, snoozed, or already reviewed. Press . to show them."),
 		}
 	}
 	return []string{"", " " + s.OK.Render("✓") + s.Normal.Render(" Nothing waits on your review.")}
@@ -470,6 +480,8 @@ func (m Model) renderRow(i int, c columns, active bool, w int) string {
 			if n > 1 {
 				right += s.Dim.Render(fmt.Sprintf(" · start at #%d", g.Start()))
 			}
+		} else if !g.Wakes.IsZero() {
+			right = s.Dim.Render("snoozed until " + wakeLabel(m.now(), g.Wakes))
 		}
 		return ui.Fit(left, right, w)
 
@@ -706,6 +718,8 @@ func state(it review.Item) string {
 		return "draft"
 	case pr.ReviewDecision == "APPROVED" || it.Need == review.NeedApproved:
 		return "approved"
+	case it.Hidden == review.HideSnoozed:
+		return "snoozed"
 	}
 	return "in review"
 }
@@ -718,7 +732,9 @@ func (m Model) foldTally(items []review.Item) string {
 		counts[state(it)]++
 	}
 	var parts []string
-	for _, word := range []string{"in review", "approved", "draft", "merged", "closed", "not available"} {
+	for _, word := range []string{
+		"in review", "snoozed", "approved", "draft", "merged", "closed", "not available",
+	} {
 		if n := counts[word]; n > 0 {
 			style := s.Dim
 			if word == "merged" || word == "approved" {
@@ -738,6 +754,8 @@ func (m Model) footerText() string {
 	switch m.mode {
 	case modeFilter:
 		return s.Prompt.Render("/") + m.input.View()
+	case modeSnooze:
+		return s.Hints(w, "↑/↓", "choose", "enter", "snooze", "esc", "cancel")
 	case modeHelp:
 		return s.Hints(
 			w,
@@ -771,7 +789,7 @@ func (m Model) footerText() string {
 		lead := s.Selected.Render(mode) + s.Dim.Render(fmt.Sprintf(" %d  ", len(sel)))
 		return lead + s.Hints(w-lipgloss.Width(lead),
 			"enter", "review in "+m.where(true), "o", "browser", "y", "copy URLs",
-			"space", "mark", "v", "visual", "esc", "clear",
+			"z", "snooze", "space", "mark", "v", "visual", "esc", "clear",
 		)
 	}
 	r, ok := m.hovered()
@@ -794,7 +812,8 @@ func (m Model) footerText() string {
 	case rowStack:
 		return s.Hints(w,
 			"j/k", "move", "enter", "review the stack's PRs for you", "space", "mark them",
-			"l/h", "unfold/fold", "[ ]", "groups", ".", "hidden", "/", "filter", "?", "help",
+			"z", "snooze", "l/h", "unfold/fold", "[ ]", "groups", ".", "hidden", "/", "filter",
+			"?", "help",
 		)
 	case rowFold:
 		return s.Hints(w, "j/k", "move", "l", "unfold", "[ ]", "groups", "?", "help")
@@ -806,8 +825,9 @@ func (m Model) footerText() string {
 		}
 	}
 	return s.Hints(w,
-		"j/k", "move", "enter", review, "space", "mark", "o", "browser", "y", "copy URL",
-		"J/K", "scroll details", "[ ]", "groups", ".", "hidden", "/", "filter", "?", "help",
+		"j/k", "move", "enter", review, "space", "mark", "z", "snooze", "o", "browser",
+		"y", "copy URL", "J/K", "scroll details", "[ ]", "groups", ".", "hidden", "/", "filter",
+		"?", "help",
 	)
 }
 
@@ -844,9 +864,12 @@ var helpSections = []ui.HelpSection{
 		{"o", "open in the browser"},
 		{"y", "copy URL(s)"},
 		{"Y", "copy branch name(s)"},
+		{"z", "snooze: leave the queue for a while"},
+		{"", "on a stack: the whole stack"},
+		{"Z", "wake what is snoozed here"},
 	}},
 	{Title: "queue", Keys: [][2]string{
-		{".", "show drafts, bots, and reviewed PRs"},
+		{".", "show hidden: drafts, snoozed, …"},
 		{"/", "filter by author, title, team, …"},
 		{"ctrl+r", "refresh now"},
 		{"esc", "clear selection, then filter"},
@@ -869,6 +892,7 @@ var helpSections = []ui.HelpSection{
 		{"re-review", "asked again, or changed since"},
 		{"waiting", "you reviewed, author's turn"},
 		{"approved", "you approved"},
+		{"snoozed", "put off until it wakes"},
 		{"via you", "asked by name, else the team"},
 	}},
 }

@@ -15,6 +15,7 @@ Agents MAY update this file without asking. When a change makes something here w
 - `internal/review`: what each PR of a review queue needs from the viewer, and how the queue groups into stacks. No I/O.
 - `internal/config`: the JSON config file, and how it sets the flags a user did not pass. Each program applies it in its `PersistentPreRunE`.
 - `internal/cache`: SQLite cache of GitHub results, generated with sqlc. Both programs use the same file.
+- `internal/state`: SQLite store of what the user decides, such as `ghrv`'s snoozes, generated with sqlc. Unlike the cache, it keeps its file across builds.
 - `internal/git`, `internal/stack`: local repository and stack state, for `ghst`.
 - `internal/demo`: made-up stacks, a made-up review queue, and made-up tabs, for `ghst demo`, `ghrv demo`, and the rendering tests.
 
@@ -29,6 +30,10 @@ GitHub does not say which files are generated. `ghrv` asks the checkout through 
 `ghst` warns when the installed `gh stack` differs from the gh-stack release it was built against (`internal/stack/version.go`). That release comes from the binary's build info, not a constant. A `replace` of gh-stack by a directory has no version and turns the check off.
 
 `ghrv` learns stacks from GitHub's stacks API, not from the local gh-stack file: the stacks are other people's. The queue's query is cheap on purpose, and `FetchReviewDetails` fetches the costly parts per PR, only when a PR's `Version` changes.
+
+User state MUST NOT go in the cache: a build that changes the cache's schema or stored types starts a new file and deletes the old one. It goes in `internal/state`, whose schema grows by numbered migrations tracked in `PRAGMA user_version`. A shipped migration MUST NOT change; add a new file.
+
+`ghrv` snoozes a PR or a whole stack (`review.Target`). `review.Snoozes.Apply` hides only PRs that would otherwise wait on the viewer, as `HideSnoozed`. The model reads snoozes through `SnoozeStore` with every queue load, to see other TUIs' snoozes, and writes them synchronously so the next read finds them. `snoozeSeq` drops reads that started before a local change. Tests use `demo.Snoozes`, which lives in memory.
 
 When `ghrv` brings a PR back for re-review (`review.Classify`): GitHub drops a request by name when the person reviews, and a team's when a member reviews. CODEOWNERS requests a team again when a push touches its files, so a team request after the viewer's approval MUST NOT count as being asked again. `viewerLatestReview` includes comments, so `Mine` prefers the viewer's latest approval or change request.
 
@@ -69,7 +74,7 @@ People can run `go run ./cmd/ghst demo` and `go run ./cmd/ghrv demo` themselves.
 
 ## Generated and pinned files
 
-- After changing `internal/cache/queries.sql` or `internal/cache/schema.sql`, run `sqlc generate`. `nix flake check` fails when the generated code is stale.
+- After changing `internal/cache/queries.sql`, `internal/cache/schema.sql`, `internal/state/queries.sql`, or `internal/state/migrations`, run `sqlc generate`. `nix flake check` fails when the generated code is stale.
 - `flake.nix` builds every program under `cmd` once, in `programs`, and gives each its own package. A new program needs a line in `packages`.
 - After changing `go.mod` dependencies, update `vendorHash` in `flake.nix`. Set it to `""`, run `nix build`, and copy the `got:` hash from the error. Then delete the `result` symlink the build leaves behind.
 - Format with `nix fmt`.

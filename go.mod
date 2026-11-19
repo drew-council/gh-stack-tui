@@ -15,6 +15,7 @@ require (
 	github.com/sebdah/goldie/v2 v2.8.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
+	golang.org/x/exp/collection v0.0.0-20261113113407-e3970619a1a4
 )
 
 require (

@@ -33,6 +33,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case modeFilter:
 		return m.handleFilterKey(msg)
+	case modeSnooze:
+		return m.handleSnoozeKey(msg)
 	}
 
 	if m.pendingKey != "" {
@@ -107,6 +109,10 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		cmd = m.copyURLs()
 	case "Y":
 		cmd = m.copyBranches()
+	case "z":
+		cmd = m.openSnooze()
+	case "Z":
+		cmd = m.wake()
 
 	// queue
 	case ".":

@@ -1,7 +1,7 @@
  ╭─ Review queue · acme/auth-service ──────────────────────────────────────────────────────── ↻ 1s ago ─╮╭──────────────────────────────────────────────────────╮
  │                                                                                                      ││                                                      │
  │ ✓ Nothing waits on your review.                                                                      ││                                                      │
- │   2 requests are left out as drafts, bots, or already reviewed. Press . to show them.                ││                                                      │
+ │   2 requests are left out as drafts, bots, snoozed, or already reviewed. Press . to show them.       ││                                                      │
  │                                                                                                      ││                                                      │
  │                                                                                                      ││                                                      │
  │                                                                                                      ││                                                      │

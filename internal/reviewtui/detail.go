@@ -290,6 +290,8 @@ func (m Model) youLines(it review.Item, w int) []string {
 		head += s.Dim.Render(" · left out of the queue")
 	case it.Hidden == review.HideWaiting:
 		head += s.Dim.Render(" on the author · left out of the queue")
+	case it.Hidden == review.HideSnoozed:
+		head += s.Dim.Render(" until " + wakeLabel(now, it.Wakes) + " · Z wakes it")
 	}
 	out = append(out, head)
 
@@ -454,6 +456,10 @@ func (m Model) stackDetail(g review.Group, items []review.Item, w int) []string 
 	out := []string{
 		s.Title.Render(g.Author) + s.Dim.Render(fmt.Sprintf(" · %s on %s",
 			ui.Plural(len(items), "PR", "PRs"), g.Stack.Base)),
+	}
+	if !g.Wakes.IsZero() {
+		out = append(out, s.Warn.Render("snoozed until "+wakeLabel(m.now(), g.Wakes))+
+			s.Dim.Render(" · Z wakes it"))
 	}
 	n, add, del, files := 0, 0, 0, 0
 	for _, it := range items {

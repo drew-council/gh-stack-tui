@@ -165,6 +165,7 @@ A pull request outside any stack whose base is not trunk starts with `on #12`, t
 | `re-review` | you reviewed, and were asked again, or commits were pushed since you commented or requested changes |
 | `waiting` | you commented or requested changes and nothing changed since: the author's turn |
 | `approved` | you approved |
+| `snoozed` | you snoozed it, or its stack, and it has not woken yet |
 | `draft`, `bot`, `merged`, `closed` | the pull request's own state |
 
 Line and file counts leave out generated files, the ones your checkout's `.gitattributes` tags `linguist-generated`, `gitlab-generated`, or `generated`, as `ghst` does. A pull request shows GitHub's totals until its files have loaded, and keeps them when it changes more than 1000 files.
@@ -179,6 +180,14 @@ The right panel answers, in order: what the pull request is, what it wants from 
 
 Some requests are not yours to act on now, and the queue leaves them out: drafts, pull requests opened by bots, the ones you approved while a team's request stays open, and the ones waiting on their author. The bottom border counts them. `.` shows them, muted, and `--drafts` and `--bots` keep those two kinds in the queue for good.
 
+### Snoozing
+
+`z` puts a request off for a while. A dialog offers durations, from an hour to two weeks, each with the time it ends. You can also type one, such as `90m`, `4h`, `1d12h`, `2w`, `tomorrow`, or `fri`. Tomorrow and weekdays end at 9 in the morning. A snoozed pull request leaves the queue until then, and comes back with a word on the status line, even when GitHub is out of reach.
+
+`z` snoozes the selection, else the pull request under the cursor. On a stack's header it snoozes the whole stack, including pull requests added to it later. `.` shows what is snoozed, and until when. `Z` wakes it early. Waking a pull request also wakes its stack.
+
+Snoozes outlive `ghrv` and upgrades. They are kept per repository in a SQLite database at `$XDG_STATE_HOME/gh-stack-tui/state.db`, else `~/.local/state/gh-stack-tui/state.db`, separate from the cache. Every running `ghrv` sees them at its next refresh. `ghrv demo` keeps its snoozes in memory.
+
 ### Keys
 
 | Navigate | | Review | |
@@ -190,6 +199,7 @@ Some requests are not yours to act on now, and the queue leaves them out: drafts
 | `J`/`K` | scroll the right panel | `y` / `Y` | copy URL(s) / branch name(s) |
 | `l` `→` / `h` `←` | unfold/fold the stack | `.` | show hidden pull requests |
 | mouse | wheel scrolls either panel, click moves the cursor | `/` | filter by author, title, number, branch, team, or label |
+| | | `z` / `Z` | snooze / wake |
 | | | `ctrl+r` | refresh now |
 | | | `esc` | clear the selection, then the filter |
 | | | `?` / `q` | help / quit |
@@ -225,6 +235,8 @@ Pass `-update` to those two packages only. Packages that do not use golden files
 `nix build .#ghst` and `nix build .#ghrv` build the programs.
 
 The cache's queries are in `internal/cache/queries.sql` and its schema in `internal/cache/schema.sql`. Run `sqlc generate` after changing either; `nix flake check` fails when the generated code is out of date.
+
+The state database, which keeps snoozes, grows by migrations in `internal/state/migrations`, run in order once each. Its queries are in `internal/state/queries.sql`, and `sqlc generate` covers them too. Never change a migration that has shipped; add a new one.
 
 This project uses Nix and direnv for a reproducible development environment.
 

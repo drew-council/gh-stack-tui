@@ -1,0 +1,40 @@
+ ╭─ Review queue · acme/auth-service ──────────────────────── 8 to review · 1 to re-review · ↻ 12s ago ─╮╭─ #303 ───────────────────────────────────────────────╮
+ │      PR    TITLE                                    AUTHOR   YOU        REVS   CI        DIFF  ASKED ││                                                      │
+ │    ● #325  Add structured logging to the gateway    elena-v  review            ✓  +1840  -220     2d ││ Model invoices and line items                        │
+ │                                                                                                      ││  OPEN  mkowalski · opened 4d ago · pushed 4h ago     │
+ │  ╭ mkowalski · stack #307 · 6 PRs on main                                  3 for you · start at #303 ││ billing/model → billing/schema                       │
+ │  │ ○ #306  Document the invoice lifecycle                    draft             ✓    +96    -3        ││ +412 -38 · 5 files · 5 commits                       │
+ │  │ ● #305  Post invoices to the ledger when they are final…  review            ●   +198   -14     1d ││                                                      │
+ │  │ ● #304  Serve invoices over the billing API               review            ✗   +322    -1     1d ││ ── you ───────────────────────────────────────────── │
+ │  │ ● #303  Model i╭─ Snooze ─────────────────────────────────────────────────────╮ +412   -38     3h ││ re-review · asked again                              │
+ │  │ ○ #302  Add the│                                                              │  +84              ││ mkowalski asked go-readability · 3h ago              │
+ │  │ ✓ #301  Extract│ #303 Model invoices and line items                           │ +310  -122        ││ you requested changes 2d ago · 2 commits since       │
+ │  ╰ main           │ leaves the queue until it wakes                              │                   ││                                                      │
+ │                   │                                                              │                   ││ ── reviewers ─────────────────────────────────────── │
+ │    ● #318  Cache t│   1 hour            until 4:00 pm                            │ +143   -27     4d ││ ✓ tobiasr approved 1d ago                            │
+ │    ● #322  Fix the│   4 hours           until 7:00 pm                            │  +12    -4    40m ││                                                      │
+ │    ● #324  on #318│   tomorrow morning  until tomorrow 9:00 am                   │  +58    -9    19h ││ ── checks ────────────────────────────────────────── │
+ │                   │   3 days            until Sun 3:00 pm                        │                   ││ 4 passed                                             │
+ │  ╭ tobiasr · stack│   monday morning    until Mon 9:00 am                        │ou · start at #337 ││ 2 unresolved threads                                 │
+ │  │ ┊ 3 PRs  1 in r│   2 weeks           until Nov 12 3:00 pm                     │                   ││                                                      │
+ │  │ ● #338  Paginat│                                                              │ +164   -40     7h ││ ── stack #307 · 3 of 6 ───────────────────────────── │
+ │▎ │ ● #337  Search │ > 1d12h                                   until Sat 3:00 am  │ +166   -12     7h ││ ↑ #304 Serve invoices over the billing API    review │
+ │  │ ┊ 5 PRs  1 appr│                                                              │                   ││ ↓ #302 Add the invoices schema migration    approved │
+ │  ╰ main           ╰──────────────────────────────────────────────────────────────╯                   ││                                                      │
+ │                                                                                                      ││ ── description ───────────────────────────────────── │
+ │                                                                                                      ││ Invoices and their line items, with the totals       │
+ │                                                                                                      ││ worked out in the money package from #301.           │
+ │                                                                                                      ││                                                      │
+ │                                                                                                      ││ An invoice is immutable once finalized. Corrections  │
+ │                                                                                                      ││ are new invoices that point at the one they replace, │
+ │                                                                                                      ││ so the ledger never rewrites history.                │
+ │                                                                                                      ││                                                      │
+ │                                                                                                      ││ Since the last review: line item totals no longer    │
+ │                                                                                                      ││ round per line, and the currency is checked when an  │
+ │                                                                                                      ││ item is added rather than at finalize.               │
+ │                                                                                                      ││                                                      │
+ │                                                                                                      ││ ── 5 files ───────────────────────────────────────── │
+ │                                                                                                      ││ A internal/billing/invoice.go                   +148 │
+ │                                                                                                      ││ A internal/billing/invoice_test.go              +163 │
+ ╰─────────────────────────────────────────────────── hidden: 1 draft · 1 bot · 1 waiting · 1 approved ─╯╰───────────────────────────────────────────────── ↓3 ─╯
+  ↑/↓ choose  enter snooze  esc cancel
